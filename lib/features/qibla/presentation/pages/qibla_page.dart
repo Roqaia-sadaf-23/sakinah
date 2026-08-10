@@ -127,9 +127,9 @@ class _AlignmentCard extends StatelessWidget {
                   ? 'turn_slightly_right'.tr
                   : 'turn_slightly_left'.tr,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: colors.onSurface,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: colors.onSurface),
             ),
           ),
         ],
@@ -215,9 +215,11 @@ class _QiblaLoading extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
+          CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const SizedBox(height: 18),
-          Text('loading_qibla'.tr, textAlign: TextAlign.center),
+          Text('loading_qibla_screen'.tr, textAlign: TextAlign.center),
         ],
       ),
     ),

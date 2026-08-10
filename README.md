@@ -13,8 +13,10 @@ companion.
 - Location/date-keyed prayer-time cache and friendly offline/error states
 - Live next-prayer selection and one-second countdown, including post-Isha rollover
 - Responsive home screen, quick-action placeholders, and a local daily prayer tracker
+- Great-circle Qibla bearing with a smoothly animated device compass
+- Qibla alignment guidance and graceful no-sensor/location error states
 
-Quran, Qibla, Azkar, Tasbih, notifications, and full tracker history UI are
+Quran, Azkar, Tasbih, notifications, and full tracker history UI are
 intentionally reserved for later phases.
 
 ## Run

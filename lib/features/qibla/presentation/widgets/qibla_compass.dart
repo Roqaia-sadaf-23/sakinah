@@ -14,7 +14,7 @@ class QiblaCompass extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final size = constraints.maxWidth.clamp(260.0, 360.0);
+      final size = constraints.maxWidth.clamp(260.0, 360.0).toDouble();
       return Obx(() {
         final aligned = controller.isAligned;
         final colors = Theme.of(context).colorScheme;
@@ -144,7 +144,15 @@ class _CompassPainter extends CustomPainter {
         ..strokeWidth = cardinal ? 2.6 : (major ? 1.7 : 1);
       canvas.drawLine(
         Offset(0, -radius + 12),
-        Offset(0, -radius + (cardinal ? 28 : major ? 23 : 18)),
+        Offset(
+          0,
+          -radius +
+              (cardinal
+                  ? 28
+                  : major
+                  ? 23
+                  : 18),
+        ),
         tickPaint,
       );
       canvas.rotate(5 * math.pi / 180);
@@ -200,7 +208,7 @@ class _CompassPainter extends CustomPainter {
     canvas.translate(lineStart.dx, lineStart.dy);
     canvas.rotate(angle + math.pi / 2);
     final kaaba = RRect.fromRectAndRadius(
-      const Rect.fromCenter(center: Offset.zero, width: 27, height: 24),
+      Rect.fromCenter(center: Offset.zero, width: 27, height: 24),
       const Radius.circular(3),
     );
     canvas.drawRRect(kaaba, Paint()..color = const Color(0xFF191A18));

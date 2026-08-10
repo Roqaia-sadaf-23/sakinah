@@ -16,12 +16,14 @@ class AppTranslations extends Translations {
     'quran': 'Quran',
     'qibla': 'Qibla',
     'qibla_direction': 'Qibla direction',
+    'loading_qibla_screen': 'Preparing the Qibla compass...',
     'current_heading': 'Current heading',
     'qibla_bearing': 'Qibla bearing',
     'turn_slightly_right': 'Turn slightly right',
     'turn_slightly_left': 'Turn slightly left',
     'facing_qibla': 'You are facing the Qibla',
-    'compass_guidance': 'Hold your phone flat and keep it away from metal objects.',
+    'compass_guidance':
+        'Hold your phone flat and keep it away from metal objects.',
     'loading_qibla': 'Preparing the Qibla compass...',
     'compass_unavailable':
         'A compass sensor is not available on this device. You can still use the Qibla bearing shown for your location.',
@@ -77,6 +79,7 @@ class AppTranslations extends Translations {
 
   static const _arabic = <String, String>{
     'qibla_direction': 'اتجاه القبلة',
+    'loading_qibla_screen': 'جارٍ تجهيز بوصلة القبلة…',
     'current_heading': 'اتجاه الجهاز',
     'qibla_bearing': 'زاوية القبلة',
     'turn_slightly_right': 'استدر قليلاً إلى اليمين',
@@ -94,8 +97,7 @@ class AppTranslations extends Translations {
         'يلزم السماح بالموقع لحساب اتجاه القبلة.',
     'qibla_location_permission_permanently_denied':
         'الوصول إلى الموقع معطّل. فعّله من إعدادات الجهاز لاستخدام بوصلة القبلة.',
-    'qibla_location_unavailable':
-        'تعذر تحديد موقعك لحساب اتجاه القبلة.',
+    'qibla_location_unavailable': 'تعذر تحديد موقعك لحساب اتجاه القبلة.',
     'north_short': 'ش',
     'east_short': 'ق',
     'south_short': 'ج',

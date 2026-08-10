@@ -6,10 +6,7 @@ class QiblaCalculator {
   static const kaabaLatitude = 21.4225;
   static const kaabaLongitude = 39.8262;
 
-  double bearingFrom({
-    required double latitude,
-    required double longitude,
-  }) {
+  double bearingFrom({required double latitude, required double longitude}) {
     final userLatitude = _toRadians(latitude);
     final kaabaLatitudeRadians = _toRadians(kaabaLatitude);
     final longitudeDifference = _toRadians(kaabaLongitude - longitude);
@@ -24,10 +21,8 @@ class QiblaCalculator {
     return normalizeDegrees(_toDegrees(math.atan2(y, x)));
   }
 
-  double signedDifference({
-    required double target,
-    required double current,
-  }) => (target - current + 540) % 360 - 180;
+  double signedDifference({required double target, required double current}) =>
+      (target - current + 540) % 360 - 180;
 
   double normalizeDegrees(double degrees) => (degrees % 360 + 360) % 360;
 
