@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../prayer_times/presentation/controllers/prayer_times_controller.dart';
+import '../../../prayer_times/presentation/controllers/prayer_reminder_controller.dart';
+import '../../../prayer_times/presentation/widgets/prayer_reminder_settings_card.dart';
 import '../../../prayer_tracker/presentation/controllers/prayer_tracker_controller.dart';
 import '../widgets/home_header.dart';
 import '../widgets/home_loading.dart';
@@ -18,6 +20,9 @@ class HomePage extends GetView<PrayerTimesController> {
   Widget build(BuildContext context) {
     final trackerController = Get.find<PrayerTrackerController>();
     final prayerTimesController = controller;
+    final reminderController = Get.isRegistered<PrayerReminderController>()
+        ? Get.find<PrayerReminderController>()
+        : null;
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -54,6 +59,12 @@ class HomePage extends GetView<PrayerTimesController> {
                             ),
                           ),
                           const SizedBox(height: 28),
+                          if (reminderController != null) ...[
+                            PrayerReminderSettingsCard(
+                              controller: reminderController,
+                            ),
+                            const SizedBox(height: 28),
+                          ],
                           const QuickActionsSection(),
                           const SizedBox(height: 28),
                           PrayerTrackerCard(controller: trackerController),

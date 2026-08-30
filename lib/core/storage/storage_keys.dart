@@ -3,6 +3,8 @@ abstract final class StorageKeys {
   static const locale = 'settings.locale';
   static const lastLocation = 'location.last_known';
   static const prayerSchedulePrefix = 'prayer_times.schedule';
+  static const prayerReminderSettings = 'prayer_reminders.settings.v1';
+  static const prayerReminderScheduledIds = 'prayer_reminders.scheduled_ids.v1';
   static const prayerTrackerPrefix = 'prayer_tracker.day';
   static const quranSurahList = 'quran.surah_list.v1';
   static const quranSurahPrefix = 'quran.surah.v1';

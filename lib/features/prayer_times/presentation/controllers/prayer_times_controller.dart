@@ -11,14 +11,20 @@ import '../../../../core/utils/date_time_extensions.dart';
 import '../../domain/entities/prayer.dart';
 import '../../domain/entities/prayer_schedule.dart';
 import '../../domain/usecases/get_prayer_schedule.dart';
+import '../services/prayer_notification_scheduler.dart';
 
 enum PrayerTimesViewStatus { loading, success, error }
 
 class PrayerTimesController extends GetxController {
-  PrayerTimesController(this._locationService, this._getPrayerSchedule);
+  PrayerTimesController(
+    this._locationService,
+    this._getPrayerSchedule, [
+    this._notificationScheduler,
+  ]);
 
   final LocationService _locationService;
   final GetPrayerSchedule _getPrayerSchedule;
+  final PrayerNotificationScheduler? _notificationScheduler;
 
   final status = PrayerTimesViewStatus.loading.obs;
   final location = Rxn<LocationData>();
@@ -114,6 +120,21 @@ class PrayerTimesController extends GetxController {
       status.value = PrayerTimesViewStatus.success;
 
       _updateNextPrayer(DateTime.now());
+
+      final scheduler = _notificationScheduler;
+      if (scheduler != null) {
+        unawaited(
+          scheduler
+              .updateSchedules(
+                today: today,
+                tomorrow: tomorrow,
+                languageCode: Get.locale?.languageCode ?? 'en',
+              )
+              .catchError((Object error, StackTrace stackTrace) {
+                debugPrint('Prayer reminder update failed: $error');
+              }),
+        );
+      }
 
       debugPrint('6 - Prayer times completed');
     } catch (error, stackTrace) {

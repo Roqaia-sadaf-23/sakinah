@@ -138,6 +138,26 @@ class AppTranslations extends Translations {
     'asr': 'Asr',
     'maghrib': 'Maghrib',
     'isha': 'Isha',
+    'prayer_reminders': 'Prayer reminders',
+    'prayer_reminders_subtitle': 'A gentle notice before each prayer',
+    'reminder_time': 'Reminder time',
+    'minutes_before_prayer': '@minutes minutes before prayer',
+    'reminder_type': 'Reminder type',
+    'reminder_takbeer': 'Takbeer',
+    'reminder_text': 'Text notification',
+    'takbeer_sound_pending':
+        'The default notification sound is used until a verified short Takbeer sound is added.',
+    'notification_permission_denied':
+        'Notifications are disabled for Sakinah. Enable them in system settings to receive prayer reminders.',
+    'exact_alarm_permission_denied':
+        'Exact alarms are disabled. Allow exact alarms so reminders can arrive precisely five minutes before prayer.',
+    'notification_scheduling_error':
+        'Prayer reminders could not be scheduled. Check notification settings and try again.',
+    'fajr_reminder': 'Fajr prayer is in 5 minutes',
+    'dhuhr_reminder': 'Dhuhr prayer is in 5 minutes',
+    'asr_reminder': 'Asr prayer is in 5 minutes',
+    'maghrib_reminder': 'Maghrib prayer is in 5 minutes',
+    'isha_reminder': 'Isha prayer is in 5 minutes',
     'loading_prayer_times': 'Finding your local prayer times…',
     'retry': 'Try again',
     'open_settings': 'Open settings',
@@ -290,6 +310,26 @@ class AppTranslations extends Translations {
     'asr': 'العصر',
     'maghrib': 'المغرب',
     'isha': 'العشاء',
+    'prayer_reminders': 'تذكير الصلاة',
+    'prayer_reminders_subtitle': 'تنبيه لطيف قبل كل صلاة',
+    'reminder_time': 'وقت التذكير',
+    'minutes_before_prayer': 'قبل الأذان بـ @minutes دقائق',
+    'reminder_type': 'نوع التنبيه',
+    'reminder_takbeer': 'تكبير',
+    'reminder_text': 'إشعار نصي',
+    'takbeer_sound_pending':
+        'يُستخدم صوت الإشعار الافتراضي حتى إضافة صوت تكبير قصير وموثّق الترخيص.',
+    'notification_permission_denied':
+        'إشعارات سكينة معطّلة. فعّلها من إعدادات النظام لاستلام تذكيرات الصلاة.',
+    'exact_alarm_permission_denied':
+        'التنبيهات الدقيقة معطّلة. اسمح بها ليصل التذكير قبل الصلاة بخمس دقائق تمامًا.',
+    'notification_scheduling_error':
+        'تعذر جدولة تذكيرات الصلاة. تحقق من إعدادات الإشعارات وحاول مجددًا.',
+    'fajr_reminder': 'أذان الفجر بعد قليل',
+    'dhuhr_reminder': 'أذان الظهر بعد قليل',
+    'asr_reminder': 'أذان العصر بعد قليل',
+    'maghrib_reminder': 'أذان المغرب بعد قليل',
+    'isha_reminder': 'أذان العشاء بعد قليل',
     'loading_prayer_times': 'جارٍ تحديد مواقيت الصلاة في موقعك…',
     'retry': 'حاول مرة أخرى',
     'open_settings': 'فتح الإعدادات',
