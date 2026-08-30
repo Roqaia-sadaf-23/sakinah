@@ -22,8 +22,11 @@ class PrayerTimesSection extends StatelessWidget {
           builder: (context, constraints) {
             final columns = constraints.maxWidth >= 600 ? 6 : 3;
             const gap = 10.0;
-            final itemWidth =
-                (constraints.maxWidth - (gap * (columns - 1))) / columns;
+            final totalSpacing = gap * (columns - 1);
+            if (constraints.maxWidth <= totalSpacing) {
+              return const SizedBox.shrink();
+            }
+            final itemWidth = (constraints.maxWidth - totalSpacing) / columns;
             return Wrap(
               spacing: gap,
               runSpacing: gap,

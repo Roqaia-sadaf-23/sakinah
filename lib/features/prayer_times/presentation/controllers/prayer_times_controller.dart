@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
@@ -60,10 +61,76 @@ class PrayerTimesController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    refreshPrayerTimes();
+    //refreshPrayerTimes();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
+  @override
+  void onReady() {
+    super.onReady();
+
+    Future.microtask(() async {
+      await refreshPrayerTimes();
+    });
+  }
+
+  Future<void> refreshPrayerTimes() async {
+    if (_isRefreshing) return;
+
+    _isRefreshing = true;
+    status.value = PrayerTimesViewStatus.loading;
+    errorKey.value = '';
+
+    try {
+      debugPrint('1 - Getting location');
+
+      final currentLocation = await _locationService.getCurrentLocation();
+
+      debugPrint('2 - Location received');
+
+      final currentDate = DateTime.now().dateOnly;
+
+      debugPrint('3 - Getting today schedule');
+
+      final today = await _getPrayerSchedule(
+        date: currentDate,
+        location: currentLocation,
+      );
+
+      debugPrint('4 - Today schedule received');
+
+      final tomorrow = await _getPrayerSchedule(
+        date: currentDate.add(const Duration(days: 1)),
+        location: currentLocation,
+      );
+
+      debugPrint('5 - Tomorrow schedule received');
+
+      location.value = currentLocation;
+      todaySchedule.value = today;
+      tomorrowSchedule.value = tomorrow;
+
+      _loadedDate = currentDate;
+      status.value = PrayerTimesViewStatus.success;
+
+      _updateNextPrayer(DateTime.now());
+
+      debugPrint('6 - Prayer times completed');
+    } catch (error, stackTrace) {
+      debugPrint('Prayer times error: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      errorKey.value = error is AppException
+          ? error.localizationKey
+          : 'prayer_times_error';
+
+      status.value = PrayerTimesViewStatus.error;
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  /*
   Future<void> refreshPrayerTimes() async {
     if (_isRefreshing) return;
     _isRefreshing = true;
@@ -94,7 +161,7 @@ class PrayerTimesController extends GetxController {
       _isRefreshing = false;
     }
   }
-
+ */
   Future<void> openRelevantSettings() async {
     if (errorKey.value == 'location_services_disabled') {
       await _locationService.openLocationSettings();

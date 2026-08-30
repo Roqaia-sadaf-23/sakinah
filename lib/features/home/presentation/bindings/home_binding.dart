@@ -15,25 +15,36 @@ class HomeBinding extends Bindings {
   @override
   void dependencies() {
     final storage = Get.find<StorageService>();
-    Get.lazyPut(() => LocationService(storage));
-    Get.lazyPut(PrayerTimesRemoteDataSource.new);
+
+    // Prayer Times dependencies
+    Get.lazyPut<LocationService>(() => LocationService(storage));
+
+    Get.lazyPut<PrayerTimesRemoteDataSource>(PrayerTimesRemoteDataSource.new);
+
     Get.lazyPut<PrayerTimesRepository>(
       () => PrayerTimesRepositoryImpl(
         Get.find<PrayerTimesRemoteDataSource>(),
         storage,
       ),
     );
-    Get.lazyPut(() => GetPrayerSchedule(Get.find<PrayerTimesRepository>()));
-    Get.lazyPut(
+
+    Get.lazyPut<GetPrayerSchedule>(
+      () => GetPrayerSchedule(Get.find<PrayerTimesRepository>()),
+    );
+
+    Get.lazyPut<PrayerTimesController>(
       () => PrayerTimesController(
         Get.find<LocationService>(),
         Get.find<GetPrayerSchedule>(),
       ),
     );
+
+    // Prayer Tracker dependencies
     Get.lazyPut<PrayerTrackerRepository>(
       () => LocalPrayerTrackerRepository(storage),
     );
-    Get.lazyPut(
+
+    Get.lazyPut<PrayerTrackerController>(
       () => PrayerTrackerController(Get.find<PrayerTrackerRepository>()),
     );
   }

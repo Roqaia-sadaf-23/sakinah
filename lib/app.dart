@@ -15,23 +15,28 @@ class IslamicCompanionApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final storage = Get.find<StorageService>();
+
     final themeController = Get.put(ThemeController(storage), permanent: true);
 
     return Obx(
       () => GetMaterialApp(
         title: 'Islamic Companion',
         debugShowCheckedModeBanner: false,
+
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: themeController.themeMode.value,
+
         translations: AppTranslations(),
         locale: themeController.locale.value,
         fallbackLocale: const Locale('en'),
+
         supportedLocales: const [Locale('en'), Locale('ar')],
+
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
+
         initialRoute: AppRoutes.home,
         getPages: AppPages.pages,
-        defaultTransition: Transition.fadeIn,
       ),
     );
   }

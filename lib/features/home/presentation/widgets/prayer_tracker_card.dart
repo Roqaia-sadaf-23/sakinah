@@ -77,8 +77,12 @@ class PrayerTrackerCard extends StatelessWidget {
             LayoutBuilder(
               builder: (context, constraints) {
                 final spacing = constraints.maxWidth < 390 ? 5.0 : 8.0;
+                final totalSpacing = spacing * 4;
+                if (constraints.maxWidth <= totalSpacing) {
+                  return const SizedBox.shrink();
+                }
                 final width =
-                    (constraints.maxWidth - spacing * 4) /
+                    (constraints.maxWidth - totalSpacing) /
                     PrayerTrackerController.prayers.length;
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -28,7 +28,11 @@ class QuickActionsSection extends StatelessWidget {
         builder: (context, constraints) {
           final columns = constraints.maxWidth >= 540 ? 4 : 2;
           const gap = 12.0;
-          final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+          final totalSpacing = gap * (columns - 1);
+          if (constraints.maxWidth <= totalSpacing) {
+            return const SizedBox.shrink();
+          }
+          final width = (constraints.maxWidth - totalSpacing) / columns;
           return Wrap(
             spacing: gap,
             runSpacing: gap,

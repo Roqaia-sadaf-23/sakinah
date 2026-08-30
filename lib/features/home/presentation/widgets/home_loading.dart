@@ -47,21 +47,27 @@ class HomePrayerLoading extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         LayoutBuilder(
-          builder: (context, constraints) => Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: List.generate(
-              6,
-              (_) => Container(
-                width: (constraints.maxWidth - 20) / 3,
-                height: 92,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(18),
+          builder: (context, constraints) {
+            const totalSpacing = 20.0;
+            if (constraints.maxWidth <= totalSpacing) {
+              return const SizedBox.shrink();
+            }
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: List.generate(
+                6,
+                (_) => Container(
+                  width: (constraints.maxWidth - totalSpacing) / 3,
+                  height: 92,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ],
     );

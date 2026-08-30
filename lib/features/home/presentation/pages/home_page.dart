@@ -17,11 +17,12 @@ class HomePage extends GetView<PrayerTimesController> {
   @override
   Widget build(BuildContext context) {
     final trackerController = Get.find<PrayerTrackerController>();
+    final prayerTimesController = controller;
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: controller.refreshPrayerTimes,
+          onRefresh: prayerTimesController.refreshPrayerTimes,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
@@ -43,9 +44,14 @@ class HomePage extends GetView<PrayerTimesController> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          HomeHeader(controller: controller),
+                          HomeHeader(controller: prayerTimesController),
                           const SizedBox(height: 24),
-                          Obx(() => _PrayerContent(controller: controller)),
+                          Obx(
+                            () => _PrayerContent(
+                              controller: prayerTimesController,
+                              status: prayerTimesController.status.value,
+                            ),
+                          ),
                           const SizedBox(height: 28),
                           const QuickActionsSection(),
                           const SizedBox(height: 28),
@@ -65,13 +71,14 @@ class HomePage extends GetView<PrayerTimesController> {
 }
 
 class _PrayerContent extends StatelessWidget {
-  const _PrayerContent({required this.controller});
+  const _PrayerContent({required this.controller, required this.status});
 
   final PrayerTimesController controller;
+  final PrayerTimesViewStatus status;
 
   @override
   Widget build(BuildContext context) {
-    return switch (controller.status.value) {
+    return switch (status) {
       PrayerTimesViewStatus.loading => const HomePrayerLoading(),
       PrayerTimesViewStatus.error => _HomeError(controller: controller),
       PrayerTimesViewStatus.success => Column(
