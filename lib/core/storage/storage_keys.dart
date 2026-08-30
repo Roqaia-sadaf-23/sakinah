@@ -8,4 +8,10 @@ abstract final class StorageKeys {
   static const quranSurahPrefix = 'quran.surah.v1';
   static const quranSelectedReciter = 'quran.selected_reciter';
   static const quranLastReadingPosition = 'quran.last_reading_position';
+  static const quranReadingMode = 'quran.reading_mode';
+  static const quranFontSize = 'quran.font_size';
+  static const azkarProgress = 'azkar.progress.v1';
+  static const azkarFavorites = 'azkar.favorites';
+  static const azkarLastPosition = 'azkar.last_position';
+  static const azkarFontSize = 'azkar.font_size';
 }

@@ -1,5 +1,8 @@
 import 'package:get/get.dart';
 
+import '../../features/azkar/presentation/bindings/azkar_binding.dart';
+import '../../features/azkar/presentation/pages/azkar_category_page.dart';
+import '../../features/azkar/presentation/pages/azkar_page.dart';
 import '../../features/home/presentation/bindings/home_binding.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/qibla/presentation/bindings/qibla_binding.dart';
@@ -28,7 +31,17 @@ abstract final class AppPages {
       page: SurahPage.new,
       binding: QuranBinding(),
     ),
-    ...{AppRoutes.azkar: 'azkar', AppRoutes.tasbih: 'tasbih'}.entries.map(
+    GetPage(
+      name: AppRoutes.azkar,
+      page: AzkarPage.new,
+      binding: AzkarBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.azkarCategory,
+      page: AzkarCategoryPage.new,
+      binding: AzkarBinding(),
+    ),
+    ...{AppRoutes.tasbih: 'tasbih'}.entries.map(
       (entry) => GetPage(
         name: entry.key,
         page: () => ComingSoonPage(featureKey: entry.value),

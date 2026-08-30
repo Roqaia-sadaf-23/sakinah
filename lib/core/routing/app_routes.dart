@@ -4,7 +4,11 @@ abstract final class AppRoutes {
   static const quranSurah = '/quran/surah/:id';
   static const qibla = '/qibla';
   static const azkar = '/azkar';
+  static const azkarCategory = '/azkar/category/:id';
   static const tasbih = '/tasbih';
 
   static String surahPath(int surahNumber) => '/quran/surah/$surahNumber';
+
+  static String azkarCategoryPath(String categoryId) =>
+      '/azkar/category/$categoryId';
 }

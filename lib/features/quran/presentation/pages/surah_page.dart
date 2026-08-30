@@ -5,13 +5,16 @@ import 'package:get/get.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah.dart';
 import '../controllers/quran_audio_controller.dart';
 import '../controllers/quran_controller.dart';
-import '../widgets/ayah_card.dart';
+import '../controllers/quran_reader_controller.dart';
 import '../widgets/quran_compact_player.dart';
+import '../widgets/quran_memorization_view.dart';
+import '../widgets/quran_reader_toolbar.dart';
+import '../widgets/quran_reading_view.dart';
 import '../widgets/quran_state_view.dart';
-import '../widgets/reciter_selector.dart';
 
 class SurahPage extends StatefulWidget {
   const SurahPage({super.key});
@@ -23,16 +26,29 @@ class SurahPage extends StatefulWidget {
 class _SurahPageState extends State<SurahPage> {
   late final QuranController _quranController;
   late final QuranAudioController _audioController;
+  late final QuranReaderController _readerController;
   late final int _surahNumber;
   late final int _initialAyahNumber;
+  late final Worker _currentAyahWorker;
+  late final Worker _readingModeWorker;
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _ayahKeys = <int, GlobalKey>{};
+  final GlobalKey<QuranReadingViewState> _readingViewKey =
+      GlobalKey<QuranReadingViewState>();
 
   @override
   void initState() {
     super.initState();
     _quranController = Get.find<QuranController>();
     _audioController = Get.find<QuranAudioController>();
+    _readerController = Get.find<QuranReaderController>();
+    _currentAyahWorker = ever<Ayah?>(_audioController.currentAyah, (ayah) {
+      if (ayah != null) _scheduleAyahScroll(ayah.numberInSurah);
+    });
+    _readingModeWorker = ever<QuranReadingMode>(
+      _readerController.readingMode,
+      (_) => _scheduleCurrentOrSavedAyahScroll(),
+    );
     _surahNumber = int.tryParse(Get.parameters['id'] ?? '') ?? 0;
     final arguments = Get.arguments;
     _initialAyahNumber = arguments is Map && arguments['ayah'] is int
@@ -64,6 +80,21 @@ class _SurahPageState extends State<SurahPage> {
 
   Future<void> _restoreReadingPosition(Surah surah) async {
     if (_initialAyahNumber > surah.ayahs.length) return;
+    if (_readerController.readingMode.value == QuranReadingMode.reading) {
+      for (var attempt = 0; attempt < 4 && mounted; attempt++) {
+        await WidgetsBinding.instance.endOfFrame;
+        final readerState = _readingViewKey.currentState;
+        if (readerState != null) {
+          await readerState.scrollAyahIntoView(
+            _initialAyahNumber,
+            _scrollController,
+            animate: false,
+          );
+          return;
+        }
+      }
+      return;
+    }
     final targetKey = _ayahKeys[_initialAyahNumber]!;
 
     for (var attempt = 0; attempt < 48 && mounted; attempt++) {
@@ -105,24 +136,61 @@ class _SurahPageState extends State<SurahPage> {
     }
   }
 
+  void _scheduleCurrentOrSavedAyahScroll() {
+    final surah = _quranController.currentSurah.value;
+    if (surah == null) return;
+    final playingAyah =
+        _audioController.currentSurah.value?.number == surah.number
+        ? _audioController.currentAyah.value?.numberInSurah
+        : null;
+    final saved = _quranController.lastReadingPosition.value;
+    final target =
+        playingAyah ??
+        (saved?.surahNumber == surah.number ? saved?.ayahNumber : null);
+    if (target != null) _scheduleAyahScroll(target);
+  }
+
+  void _scheduleAyahScroll(int ayahNumber) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_readerController.readingMode.value == QuranReadingMode.reading) {
+        unawaited(
+          _readingViewKey.currentState?.scrollAyahIntoView(
+                ayahNumber,
+                _scrollController,
+              ) ??
+              Future<void>.value(),
+        );
+        return;
+      }
+      final ayahContext = _ayahKeys[ayahNumber]?.currentContext;
+      if (ayahContext != null && ayahContext.mounted) {
+        unawaited(
+          Scrollable.ensureVisible(
+            ayahContext,
+            alignment: 0.2,
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutCubic,
+          ),
+        );
+      }
+    });
+  }
+
   @override
   void dispose() {
     if (Get.isRegistered<QuranAudioController>()) {
       unawaited(_audioController.stop());
     }
+    _currentAyahWorker.dispose();
+    _readingModeWorker.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text('quran_surah'.tr),
-      actions: [
-        ReciterSelectorButton(controller: _audioController, iconOnly: true),
-        const SizedBox(width: 6),
-      ],
-    ),
+    appBar: AppBar(title: Text('quran_surah'.tr)),
     bottomNavigationBar: QuranCompactPlayer(controller: _audioController),
     body: SafeArea(top: false, child: Obx(() => _buildBody(context))),
   );
@@ -142,8 +210,10 @@ class _SurahPageState extends State<SurahPage> {
           initialAyahNumber: _initialAyahNumber,
           quranController: _quranController,
           audioController: _audioController,
+          readerController: _readerController,
           scrollController: _scrollController,
           ayahKeyFor: (number) => _ayahKeys.putIfAbsent(number, GlobalKey.new),
+          readingViewKey: _readingViewKey,
         ),
       };
 }
@@ -154,16 +224,20 @@ class _SurahReader extends StatelessWidget {
     required this.initialAyahNumber,
     required this.quranController,
     required this.audioController,
+    required this.readerController,
     required this.scrollController,
     required this.ayahKeyFor,
+    required this.readingViewKey,
   });
 
   final Surah surah;
   final int initialAyahNumber;
   final QuranController quranController;
   final QuranAudioController audioController;
+  final QuranReaderController readerController;
   final ScrollController scrollController;
   final GlobalKey Function(int number) ayahKeyFor;
+  final GlobalKey<QuranReadingViewState> readingViewKey;
 
   @override
   Widget build(BuildContext context) => CustomScrollView(
@@ -186,29 +260,40 @@ class _SurahReader extends StatelessWidget {
           ),
         ),
       ),
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 36),
-        sliver: SliverList.builder(
-          itemCount: surah.ayahs.length * 2 - 1,
-          itemBuilder: (context, index) {
-            if (index.isOdd) return const SizedBox(height: 12);
-            final ayah = surah.ayahs[index ~/ 2];
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: AppConstants.maxContentWidth,
-                ),
-                child: AyahCard(
-                  key: ayahKeyFor(ayah.numberInSurah),
+      SliverToBoxAdapter(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AppConstants.maxContentWidth,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              child: QuranReaderToolbar(
+                readerController: readerController,
+                audioController: audioController,
+              ),
+            ),
+          ),
+        ),
+      ),
+      Obx(
+        () => readerController.readingMode.value == QuranReadingMode.reading
+            ? SliverToBoxAdapter(
+                child: QuranReadingView(
+                  key: readingViewKey,
                   surah: surah,
-                  ayah: ayah,
                   quranController: quranController,
                   audioController: audioController,
+                  readerController: readerController,
                 ),
+              )
+            : QuranMemorizationView(
+                surah: surah,
+                quranController: quranController,
+                audioController: audioController,
+                readerController: readerController,
+                ayahKeyFor: ayahKeyFor,
               ),
-            );
-          },
-        ),
       ),
     ],
   );

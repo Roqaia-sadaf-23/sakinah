@@ -11,6 +11,7 @@ import '../../domain/usecases/get_quran_surahs.dart';
 import '../../domain/usecases/get_surah.dart';
 import '../controllers/quran_audio_controller.dart';
 import '../controllers/quran_controller.dart';
+import '../controllers/quran_reader_controller.dart';
 
 class QuranBinding extends Bindings {
   @override
@@ -57,6 +58,9 @@ class QuranBinding extends Bindings {
           Get.find<QuranAudioPlayer>(),
         ),
       );
+    }
+    if (!Get.isRegistered<QuranReaderController>()) {
+      Get.lazyPut(() => QuranReaderController(Get.find<StorageService>()));
     }
   }
 }

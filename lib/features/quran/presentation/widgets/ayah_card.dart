@@ -8,6 +8,7 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah.dart';
 import '../controllers/quran_audio_controller.dart';
 import '../controllers/quran_controller.dart';
+import '../controllers/quran_reader_controller.dart';
 
 class AyahCard extends StatelessWidget {
   const AyahCard({
@@ -15,6 +16,7 @@ class AyahCard extends StatelessWidget {
     required this.ayah,
     required this.quranController,
     required this.audioController,
+    required this.readerController,
     super.key,
   });
 
@@ -22,6 +24,7 @@ class AyahCard extends StatelessWidget {
   final Ayah ayah;
   final QuranController quranController;
   final QuranAudioController audioController;
+  final QuranReaderController readerController;
 
   @override
   Widget build(BuildContext context) => Obx(() {
@@ -35,6 +38,7 @@ class AyahCard extends StatelessWidget {
         quranController.lastReadingPosition.value?.ayahNumber ==
             ayah.numberInSurah;
     final colorScheme = Theme.of(context).colorScheme;
+    final fontSize = readerController.fontSize.value;
 
     return Semantics(
       button: true,
@@ -96,7 +100,7 @@ class AyahCard extends StatelessWidget {
                     ayah.text,
                     textAlign: TextAlign.right,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontSize: 25,
+                      fontSize: fontSize,
                       fontWeight: FontWeight.w500,
                       height: 2,
                       color: Theme.of(context).brightness == Brightness.light

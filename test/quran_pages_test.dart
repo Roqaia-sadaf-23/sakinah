@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:sakinah/core/localization/app_translations.dart';
 import 'package:sakinah/core/routing/app_routes.dart';
+import 'package:sakinah/core/storage/storage_service.dart';
 import 'package:sakinah/features/quran/domain/entities/ayah.dart';
 import 'package:sakinah/features/quran/domain/entities/quran_reading_position.dart';
 import 'package:sakinah/features/quran/domain/entities/reciter.dart';
@@ -15,9 +17,11 @@ import 'package:sakinah/features/quran/domain/usecases/get_quran_surahs.dart';
 import 'package:sakinah/features/quran/domain/usecases/get_surah.dart';
 import 'package:sakinah/features/quran/presentation/controllers/quran_audio_controller.dart';
 import 'package:sakinah/features/quran/presentation/controllers/quran_controller.dart';
+import 'package:sakinah/features/quran/presentation/controllers/quran_reader_controller.dart';
 import 'package:sakinah/features/quran/presentation/pages/quran_page.dart';
 import 'package:sakinah/features/quran/presentation/pages/surah_page.dart';
 import 'package:sakinah/features/quran/presentation/widgets/ayah_card.dart';
+import 'package:sakinah/features/quran/presentation/widgets/quran_reading_view.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -46,7 +50,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('SurahPage displays RTL Ayahs and plays a tapped Ayah', (
+  testWidgets('Reading mode flows RTL Ayahs and plays the exact tapped span', (
     tester,
   ) async {
     _setNarrowScreen(tester);
@@ -62,15 +66,113 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controllers.quran.currentSurah.value?.ayahs, hasLength(7));
-    expect(find.byType(AyahCard), findsWidgets);
-    expect(find.text('بِسْمِ ٱللَّهِ'), findsOneWidget);
+    expect(find.byType(QuranReadingView), findsOneWidget);
+    expect(find.byType(AyahCard), findsNothing);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('بِسْمِ ٱللَّهِ'));
+    final richText = tester.widget<RichText>(
+      find.descendant(
+        of: find.byKey(const Key('quran-continuous-text')),
+        matching: find.byType(RichText),
+      ),
+    );
+    final rootSpan = richText.text as TextSpan;
+    final secondAyahSpan = rootSpan.children![1] as TextSpan;
+    expect(secondAyahSpan.recognizer, isA<TapGestureRecognizer>());
+    (secondAyahSpan.recognizer! as TapGestureRecognizer).onTap?.call();
+    await tester.pump();
     await tester.pump();
 
+    expect(controllers.audio.currentAyah.value?.numberInSurah, 2);
+    expect(controllers.player.playedUrls.single, endsWith('/2.mp3'));
+    expect(find.byType(QuranReadingView, skipOffstage: false), findsOneWidget);
+
+    final highlightedRichText = tester.widget<RichText>(
+      find.descendant(
+        of: find.byKey(const Key('quran-continuous-text'), skipOffstage: false),
+        matching: find.byType(RichText, skipOffstage: false),
+      ),
+    );
+    final highlightedRoot = highlightedRichText.text as TextSpan;
+    final highlightedAyah = highlightedRoot.children![1] as TextSpan;
+    expect(highlightedAyah.style?.backgroundColor, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Memorization mode preserves Ayah cards without refetching', (
+    tester,
+  ) async {
+    _setNarrowScreen(tester);
+    final repository = _WidgetQuranRepository();
+    final controllers = _registerControllers(repository);
+
+    await tester.pumpWidget(
+      _testApp(
+        initialRoute: AppRoutes.surahPath(1),
+        pages: [GetPage(name: AppRoutes.quranSurah, page: SurahPage.new)],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(repository.surahRequests, 1);
+
+    await tester.tap(find.text('Memorization'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(QuranReadingView), findsNothing);
+    expect(find.byType(AyahCard), findsWidgets);
+    await tester.tap(find.text('بِسْمِ ٱللَّهِ'));
+    await tester.pump();
     expect(controllers.audio.currentAyah.value?.numberInSurah, 1);
     expect(controllers.player.playedUrls.single, endsWith('/1.mp3'));
+
+    controllers.reader.setReadingMode(QuranReadingMode.reading);
+    await tester.pumpAndSettle();
+    expect(repository.surahRequests, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Quran font controls remain within 20 to 42', (tester) async {
+    _setNarrowScreen(tester);
+    final repository = _WidgetQuranRepository();
+    final controllers = _registerControllers(repository);
+
+    await tester.pumpWidget(
+      _testApp(
+        initialRoute: AppRoutes.surahPath(1),
+        pages: [GetPage(name: AppRoutes.quranSurah, page: SurahPage.new)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (var index = 0; index < 7; index++) {
+      await tester.tap(find.byTooltip('Increase Quran font size'));
+      await tester.pump();
+    }
+    expect(controllers.reader.fontSize.value, 42);
+
+    final richText = tester.widget<RichText>(
+      find.descendant(
+        of: find.byKey(const Key('quran-continuous-text')),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect((richText.text as TextSpan).style?.fontSize, 42);
+    expect(tester.takeException(), isNull);
+
+    controllers.reader.setReadingMode(QuranReadingMode.memorization);
+    await tester.pumpAndSettle();
+    expect(find.byType(AyahCard), findsWidgets);
+    expect(tester.takeException(), isNull);
+    controllers.reader.setReadingMode(QuranReadingMode.reading);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byTooltip('Decrease Quran font size'));
+    await tester.pumpAndSettle();
+    for (var index = 0; index < 11; index++) {
+      await tester.tap(find.byTooltip('Decrease Quran font size'));
+      await tester.pump();
+    }
+    expect(controllers.reader.fontSize.value, 20);
     expect(tester.takeException(), isNull);
   });
 
@@ -103,18 +205,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controllers.quran.lastReadingPosition.value?.ayahNumber, 7);
-    expect(find.text('آية 7'), findsOneWidget);
-    final scrollView = tester.widget<CustomScrollView>(
-      find.byType(CustomScrollView),
-    );
-    expect(scrollView.controller?.offset, greaterThan(0));
+    expect(find.byType(QuranReadingView), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
 
-({QuranController quran, QuranAudioController audio, _WidgetAudioPlayer player})
+({
+  QuranController quran,
+  QuranAudioController audio,
+  QuranReaderController reader,
+  _WidgetAudioPlayer player,
+})
 _registerControllers(_WidgetQuranRepository repository) {
   final player = _WidgetAudioPlayer();
+  final storage = _MemoryStorageService();
   final quran = Get.put(
     QuranController(
       GetQuranSurahs(repository),
@@ -123,7 +227,8 @@ _registerControllers(_WidgetQuranRepository repository) {
     ),
   );
   final audio = Get.put(QuranAudioController(repository, player));
-  return (quran: quran, audio: audio, player: player);
+  final reader = Get.put(QuranReaderController(storage));
+  return (quran: quran, audio: audio, reader: reader, player: player);
 }
 
 Widget _testApp({
@@ -148,6 +253,7 @@ void _setNarrowScreen(WidgetTester tester) {
 class _WidgetQuranRepository implements QuranRepository {
   QuranReadingPosition? position;
   Reciter reciter = SupportedReciters.misharyAlafasy;
+  int surahRequests = 0;
 
   @override
   Future<List<Surah>> getSurahs({bool forceRefresh = false}) async =>
@@ -165,26 +271,30 @@ class _WidgetQuranRepository implements QuranRepository {
       );
 
   @override
-  Future<Surah> getSurah(int surahNumber, {bool forceRefresh = false}) async =>
-      Surah(
-        number: 1,
-        arabicName: 'سُورَةُ ٱلْفَاتِحَةِ',
-        englishName: 'Al-Faatiha',
-        englishNameTranslation: 'The Opening',
-        revelationType: 'Meccan',
-        numberOfAyahs: 7,
-        ayahs: List<Ayah>.generate(
-          7,
-          (index) => Ayah(
-            number: index + 1,
-            numberInSurah: index + 1,
-            text: index == 0 ? 'بِسْمِ ٱللَّهِ' : 'آية ${index + 1}',
-            juz: 1,
-            page: 1,
-          ),
-          growable: false,
+  Future<Surah> getSurah(int surahNumber, {bool forceRefresh = false}) async {
+    surahRequests++;
+    return Surah(
+      number: 1,
+      arabicName: 'سُورَةُ ٱلْفَاتِحَةِ',
+      englishName: 'Al-Faatiha',
+      englishNameTranslation: 'The Opening',
+      revelationType: 'Meccan',
+      numberOfAyahs: 7,
+      ayahs: List<Ayah>.generate(
+        7,
+        (index) => Ayah(
+          number: index + 1,
+          numberInSurah: index + 1,
+          text: index == 0
+              ? 'بِسْمِ ٱللَّهِ'
+              : List<String>.filled(12, 'آية ${index + 1}').join(' '),
+          juz: 1,
+          page: 1,
         ),
-      );
+        growable: false,
+      ),
+    );
+  }
 
   @override
   Future<Map<int, String>> getAyahAudioUrls({
@@ -236,4 +346,17 @@ class _WidgetAudioPlayer implements QuranAudioPlayer {
 
   @override
   Future<void> dispose() => _completed.close();
+}
+
+class _MemoryStorageService extends StorageService {
+  final Map<String, String> values = <String, String>{};
+
+  @override
+  String? readString(String key) => values[key];
+
+  @override
+  Future<bool> writeString(String key, String value) async {
+    values[key] = value;
+    return true;
+  }
 }
