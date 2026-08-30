@@ -42,6 +42,7 @@ class HomePage extends GetView<PrayerTimesController> {
                         40,
                       ),
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           HomeHeader(controller: prayerTimesController),
@@ -82,6 +83,7 @@ class _PrayerContent extends StatelessWidget {
       PrayerTimesViewStatus.loading => const HomePrayerLoading(),
       PrayerTimesViewStatus.error => _HomeError(controller: controller),
       PrayerTimesViewStatus.success => Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (controller.isUsingCache) ...[
@@ -134,6 +136,7 @@ class _HomeError extends StatelessWidget {
     child: Padding(
       padding: const EdgeInsets.all(28),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 64,

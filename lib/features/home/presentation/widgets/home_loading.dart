@@ -10,6 +10,7 @@ class HomePrayerLoading extends StatelessWidget {
       context,
     ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.65);
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
@@ -49,7 +50,8 @@ class HomePrayerLoading extends StatelessWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             const totalSpacing = 20.0;
-            if (constraints.maxWidth <= totalSpacing) {
+            if (!constraints.hasBoundedWidth ||
+                constraints.maxWidth <= totalSpacing) {
               return const SizedBox.shrink();
             }
             return Wrap(

@@ -16,6 +16,7 @@ class PrayerTrackerCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -35,6 +36,7 @@ class PrayerTrackerCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -78,7 +80,8 @@ class PrayerTrackerCard extends StatelessWidget {
               builder: (context, constraints) {
                 final spacing = constraints.maxWidth < 390 ? 5.0 : 8.0;
                 final totalSpacing = spacing * 4;
-                if (constraints.maxWidth <= totalSpacing) {
+                if (!constraints.hasBoundedWidth ||
+                    constraints.maxWidth <= totalSpacing) {
                   return const SizedBox.shrink();
                 }
                 final width =
@@ -130,6 +133,7 @@ class _PrayerCheck extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 220),

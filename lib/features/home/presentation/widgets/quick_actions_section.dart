@@ -20,6 +20,7 @@ class QuickActionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text('quick_actions'.tr, style: Theme.of(context).textTheme.titleLarge),
@@ -29,7 +30,8 @@ class QuickActionsSection extends StatelessWidget {
           final columns = constraints.maxWidth >= 540 ? 4 : 2;
           const gap = 12.0;
           final totalSpacing = gap * (columns - 1);
-          if (constraints.maxWidth <= totalSpacing) {
+          if (!constraints.hasBoundedWidth ||
+              constraints.maxWidth <= totalSpacing) {
             return const SizedBox.shrink();
           }
           final width = (constraints.maxWidth - totalSpacing) / columns;

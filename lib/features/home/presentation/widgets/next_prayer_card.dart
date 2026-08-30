@@ -34,7 +34,8 @@ class NextPrayerCard extends StatelessWidget {
           padding: const EdgeInsets.all(26),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 540;
+              final wide =
+                  constraints.hasBoundedWidth && constraints.maxWidth >= 540;
               final prayerInfo = _PrayerInfo(
                 name: prayer?.name.key.tr ?? '—',
                 time: prayer == null ? '—' : controller.formatTime(prayer.time),
@@ -57,8 +58,9 @@ class NextPrayerCard extends StatelessWidget {
                 );
               }
               return Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [prayerInfo, const Spacer(), countdown],
+                children: [prayerInfo, const SizedBox(height: 28), countdown],
               );
             },
           ),

@@ -14,6 +14,7 @@ class PrayerTimesSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final prayers = controller.todaySchedule.value?.prayers ?? const <Prayer>[];
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeading(title: 'prayer_times'.tr, icon: Icons.schedule_rounded),
@@ -23,7 +24,8 @@ class PrayerTimesSection extends StatelessWidget {
             final columns = constraints.maxWidth >= 600 ? 6 : 3;
             const gap = 10.0;
             final totalSpacing = gap * (columns - 1);
-            if (constraints.maxWidth <= totalSpacing) {
+            if (!constraints.hasBoundedWidth ||
+                constraints.maxWidth <= totalSpacing) {
               return const SizedBox.shrink();
             }
             final itemWidth = (constraints.maxWidth - totalSpacing) / columns;
@@ -78,6 +80,7 @@ class _PrayerTimeTile extends StatelessWidget {
         ),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             _iconFor(prayer.name),
