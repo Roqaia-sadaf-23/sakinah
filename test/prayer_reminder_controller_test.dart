@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:sakinah/core/localization/app_translations.dart';
 import 'package:sakinah/core/notifications/notification_service.dart';
 import 'package:sakinah/core/storage/storage_keys.dart';
 import 'package:sakinah/core/storage/storage_service.dart';
 import 'package:sakinah/features/prayer_times/domain/entities/prayer_reminder_settings.dart';
 import 'package:sakinah/features/prayer_times/presentation/controllers/prayer_reminder_controller.dart';
 import 'package:sakinah/features/prayer_times/presentation/services/prayer_notification_scheduler.dart';
+import 'package:sakinah/features/prayer_times/presentation/widgets/prayer_reminder_settings_card.dart';
 
 void main() {
   setUp(() {
@@ -55,6 +57,41 @@ void main() {
       controller.permissionIssue.value,
       PrayerReminderPermissionIssue.notifications,
     );
+  });
+
+  testWidgets('settings card is constraint-safe on a narrow phone', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final controller = PrayerReminderController(
+      storage,
+      PrayerNotificationScheduler(notifications, storage),
+      notifications,
+    )..onInit();
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        translations: AppTranslations(),
+        locale: const Locale('en'),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            child: PrayerReminderSettingsCard(controller: controller),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Prayer reminders'), findsOneWidget);
+    expect(find.text('Takbeer'), findsOneWidget);
+    expect(find.text('Text notification'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
 

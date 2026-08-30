@@ -74,15 +74,25 @@ class PrayerReminderSettingsCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Icon(Icons.schedule_rounded, size: 20),
                   const SizedBox(width: 10),
-                  Expanded(child: Text('reminder_time'.tr)),
-                  Text(
-                    'minutes_before_prayer'.trParams({
-                      'minutes': '${settings.minutesBefore}',
-                    }),
-                    style: Theme.of(context).textTheme.labelLarge,
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('reminder_time'.tr),
+                        const SizedBox(height: 2),
+                        Text(
+                          'minutes_before_prayer'.trParams({
+                            'minutes': '${settings.minutesBefore}',
+                          }),
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
