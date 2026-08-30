@@ -10,7 +10,8 @@ import '../../features/qibla/presentation/pages/qibla_page.dart';
 import '../../features/quran/presentation/bindings/quran_binding.dart';
 import '../../features/quran/presentation/pages/quran_page.dart';
 import '../../features/quran/presentation/pages/surah_page.dart';
-import '../widgets/coming_soon_page.dart';
+import '../../features/tasbih/presentation/bindings/tasbih_binding.dart';
+import '../../features/tasbih/presentation/pages/tasbih_page.dart';
 import 'app_routes.dart';
 
 abstract final class AppPages {
@@ -41,11 +42,10 @@ abstract final class AppPages {
       page: AzkarCategoryPage.new,
       binding: AzkarBinding(),
     ),
-    ...{AppRoutes.tasbih: 'tasbih'}.entries.map(
-      (entry) => GetPage(
-        name: entry.key,
-        page: () => ComingSoonPage(featureKey: entry.value),
-      ),
+    GetPage(
+      name: AppRoutes.tasbih,
+      page: TasbihPage.new,
+      binding: TasbihBinding(),
     ),
   ];
 }

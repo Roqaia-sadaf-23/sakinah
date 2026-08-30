@@ -14,4 +14,5 @@ abstract final class StorageKeys {
   static const azkarFavorites = 'azkar.favorites';
   static const azkarLastPosition = 'azkar.last_position';
   static const azkarFontSize = 'azkar.font_size';
+  static const tasbihProgress = 'tasbih.progress.v1';
 }
