@@ -14,9 +14,16 @@ class QiblaCompass extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final size = constraints.maxWidth.clamp(260.0, 360.0).toDouble();
+      final availableWidth = constraints.hasBoundedWidth
+          ? constraints.maxWidth
+          : 360.0;
+      final size = math.min(360.0, math.max(0.0, availableWidth));
+      if (size == 0) return const SizedBox.shrink();
       return Obx(() {
         final aligned = controller.isAligned;
+        final rotationHeading = controller.hasHeading
+            ? controller.continuousHeading.value
+            : 0.0;
         final colors = Theme.of(context).colorScheme;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 280),
@@ -47,7 +54,7 @@ class QiblaCompass extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               TweenAnimationBuilder<double>(
-                tween: Tween(end: controller.continuousHeading.value),
+                tween: Tween(end: rotationHeading),
                 duration: const Duration(milliseconds: 260),
                 curve: Curves.easeOut,
                 builder: (context, value, child) => Transform.rotate(

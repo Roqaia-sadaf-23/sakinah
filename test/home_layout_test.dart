@@ -109,11 +109,16 @@ Widget _testApp(Widget home) => GetMaterialApp(
 _TestPrayerTimesController _registerHomeControllers() {
   final storage = _MemoryStorageService();
   Get.put<ThemeController>(ThemeController(storage));
+  final prayerTimesController =
+      Get.put<PrayerTimesController>(_TestPrayerTimesController(storage))
+          as _TestPrayerTimesController;
   Get.put<PrayerTrackerController>(
-    PrayerTrackerController(_MemoryPrayerTrackerRepository()),
+    PrayerTrackerController(
+      _MemoryPrayerTrackerRepository(),
+      prayerTimesController,
+    ),
   );
-  return Get.put<PrayerTimesController>(_TestPrayerTimesController(storage))
-      as _TestPrayerTimesController;
+  return prayerTimesController;
 }
 
 void _setSuccessfulSchedule(PrayerTimesController controller) {

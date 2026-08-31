@@ -10,6 +10,8 @@ import '../../domain/services/qibla_calculator.dart';
 
 enum QiblaViewStatus { loading, ready, error }
 
+enum QiblaCompassStatus { waiting, available, unavailable }
+
 class QiblaController extends GetxController {
   QiblaController(
     this._locationService,
@@ -18,6 +20,7 @@ class QiblaController extends GetxController {
   );
 
   static const alignmentTolerance = 3.0;
+  static const calibrationAccuracyThreshold = 30.0;
   static const _smoothingFactor = 0.18;
   static const _sensorWaitDuration = Duration(seconds: 6);
 
@@ -26,18 +29,30 @@ class QiblaController extends GetxController {
   final QiblaCalculator _calculator;
 
   final status = QiblaViewStatus.loading.obs;
+  final compassStatus = QiblaCompassStatus.waiting.obs;
   final location = Rxn<LocationData>();
   final qiblaBearing = 0.0.obs;
-  final heading = 0.0.obs;
+  final heading = Rxn<double>();
+  final compassAccuracy = Rxn<double>();
   final continuousHeading = 0.0.obs;
   final directionDifference = 0.0.obs;
   final errorKey = ''.obs;
+  final compassErrorKey = ''.obs;
 
-  StreamSubscription<double?>? _headingSubscription;
+  StreamSubscription<CompassReading>? _headingSubscription;
   Timer? _sensorTimer;
   bool _hasHeading = false;
 
-  bool get isAligned => directionDifference.value.abs() <= alignmentTolerance;
+  bool get hasHeading => heading.value != null;
+
+  bool get isAligned =>
+      hasHeading && directionDifference.value.abs() <= alignmentTolerance;
+
+  bool get needsCalibration {
+    final accuracy = compassAccuracy.value;
+    return hasHeading &&
+        (accuracy == null || accuracy > calibrationAccuracyThreshold);
+  }
 
   bool get shouldTurnRight => directionDifference.value > 0;
 
@@ -62,7 +77,13 @@ class QiblaController extends GetxController {
     _sensorTimer?.cancel();
     _hasHeading = false;
     status.value = QiblaViewStatus.loading;
+    compassStatus.value = QiblaCompassStatus.waiting;
+    heading.value = null;
+    compassAccuracy.value = null;
+    continuousHeading.value = 0;
+    directionDifference.value = 0;
     errorKey.value = '';
+    compassErrorKey.value = '';
 
     try {
       final currentLocation = await _locationService.getCurrentLocation();
@@ -71,6 +92,7 @@ class QiblaController extends GetxController {
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
       );
+      status.value = QiblaViewStatus.ready;
       _listenToHeading();
     } catch (error) {
       _showError(error);
@@ -88,34 +110,37 @@ class QiblaController extends GetxController {
   void _listenToHeading() {
     _sensorTimer = Timer(_sensorWaitDuration, () {
       if (!_hasHeading) {
-        _showError(const AppException(AppErrorType.sensorUnavailable));
+        _showCompassError(const AppException(AppErrorType.sensorUnavailable));
       }
     });
 
     try {
-      _headingSubscription = _compassRepository.headingStream.listen(
-        _onHeading,
-        onError: _showError,
+      _headingSubscription = _compassRepository.readings.listen(
+        _onCompassReading,
+        onError: _showCompassError,
         cancelOnError: false,
       );
     } catch (error) {
-      _showError(error);
+      _showCompassError(error);
     }
   }
 
-  void _onHeading(double? rawHeading) {
+  void _onCompassReading(CompassReading reading) {
+    final rawHeading = reading.heading;
     if (rawHeading == null || !rawHeading.isFinite) {
-      _showError(const AppException(AppErrorType.sensorUnavailable));
+      _showCompassError(const AppException(AppErrorType.sensorUnavailable));
       return;
     }
 
+    compassAccuracy.value = reading.accuracy;
+    compassErrorKey.value = '';
+    compassStatus.value = QiblaCompassStatus.available;
     final normalized = _calculator.normalizeDegrees(rawHeading);
     if (!_hasHeading) {
       _hasHeading = true;
       _sensorTimer?.cancel();
       continuousHeading.value = normalized;
       heading.value = normalized;
-      status.value = QiblaViewStatus.ready;
     } else {
       final currentNormalized = _calculator.normalizeDegrees(
         continuousHeading.value,
@@ -130,8 +155,20 @@ class QiblaController extends GetxController {
 
     directionDifference.value = _calculator.signedDifference(
       target: qiblaBearing.value,
-      current: heading.value,
+      current: heading.value!,
     );
+  }
+
+  void _showCompassError(Object error) {
+    _sensorTimer?.cancel();
+    _hasHeading = false;
+    heading.value = null;
+    compassAccuracy.value = null;
+    final exception = error is AppException
+        ? error
+        : AppException(AppErrorType.sensor, error);
+    compassErrorKey.value = exception.localizationKey;
+    compassStatus.value = QiblaCompassStatus.unavailable;
   }
 
   void _showError(Object error) {

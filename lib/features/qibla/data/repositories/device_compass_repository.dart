@@ -5,13 +5,16 @@ import '../../domain/repositories/compass_repository.dart';
 
 class DeviceCompassRepository implements CompassRepository {
   @override
-  Stream<double?> get headingStream {
+  Stream<CompassReading> get readings {
     final events = FlutterCompass.events;
     if (events == null) {
-      return Stream<double?>.error(
+      return Stream<CompassReading>.error(
         const AppException(AppErrorType.sensorUnavailable),
       );
     }
-    return events.map((event) => event.heading);
+    return events.map(
+      (event) =>
+          CompassReading(heading: event.heading, accuracy: event.accuracy),
+    );
   }
 }

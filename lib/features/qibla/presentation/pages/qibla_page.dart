@@ -64,16 +64,14 @@ class _QiblaReady extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              'compass_guidance'.tr,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            if (controller.location.value?.isCached == true) ...[
+              const SizedBox(height: 8),
+              const _CachedLocationLabel(),
+            ],
             const SizedBox(height: 26),
             QiblaCompass(controller: controller),
             const SizedBox(height: 26),
-            _AlignmentCard(controller: controller),
+            _CompassFeedbackCard(controller: controller),
             const SizedBox(height: 16),
             _DirectionMetrics(controller: controller),
           ],
@@ -83,26 +81,86 @@ class _QiblaReady extends StatelessWidget {
   );
 }
 
-class _AlignmentCard extends StatelessWidget {
-  const _AlignmentCard({required this.controller});
+class _CachedLocationLabel extends StatelessWidget {
+  const _CachedLocationLabel();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.history_rounded, size: 15),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            'cached_location'.tr,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CompassFeedbackCard extends StatelessWidget {
+  const _CompassFeedbackCard({required this.controller});
 
   final QiblaController controller;
 
   @override
   Widget build(BuildContext context) => Obx(() {
+    final hasHeading = controller.hasHeading;
     final aligned = controller.isAligned;
+    final calibrating = controller.needsCalibration;
+    final unavailable =
+        controller.compassStatus.value == QiblaCompassStatus.unavailable;
     final colors = Theme.of(context).colorScheme;
+    final (icon, message, emphasized) = switch ((
+      unavailable,
+      calibrating,
+      hasHeading,
+      aligned,
+    )) {
+      (true, _, _, _) => (
+        Icons.explore_off_rounded,
+        controller.compassErrorKey.value.tr,
+        false,
+      ),
+      (_, true, _, _) || (_, _, false, _) => (
+        Icons.screen_rotation_alt_rounded,
+        'qibla_calibrating'.tr,
+        false,
+      ),
+      (_, _, _, true) => (Icons.check_circle_rounded, 'facing_qibla'.tr, true),
+      _ => (
+        controller.shouldTurnRight
+            ? Icons.rotate_right_rounded
+            : Icons.rotate_left_rounded,
+        controller.shouldTurnRight
+            ? 'turn_slightly_right'.tr
+            : 'turn_slightly_left'.tr,
+        false,
+      ),
+    };
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 280),
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
       decoration: BoxDecoration(
-        color: aligned
+        color: emphasized
             ? colors.primaryContainer
             : colors.surfaceContainerHighest.withValues(alpha: 0.65),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: aligned
+          color: emphasized
               ? colors.primary.withValues(alpha: 0.35)
               : colors.outlineVariant.withValues(alpha: 0.5),
         ),
@@ -110,22 +168,11 @@ class _AlignmentCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            aligned
-                ? Icons.check_circle_rounded
-                : controller.shouldTurnRight
-                ? Icons.rotate_right_rounded
-                : Icons.rotate_left_rounded,
-            color: colors.primary,
-          ),
+          Icon(icon, color: colors.primary),
           const SizedBox(width: 10),
           Flexible(
             child: Text(
-              aligned
-                  ? 'facing_qibla'.tr
-                  : controller.shouldTurnRight
-                  ? 'turn_slightly_right'.tr
-                  : 'turn_slightly_left'.tr,
+              message,
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,
@@ -144,27 +191,32 @@ class _DirectionMetrics extends StatelessWidget {
   final QiblaController controller;
 
   @override
-  Widget build(BuildContext context) => Obx(
-    () => Row(
+  Widget build(BuildContext context) => Obx(() {
+    final currentHeading = controller.heading.value;
+    return Row(
       children: [
         Expanded(
           child: _MetricCard(
             icon: Icons.screen_rotation_rounded,
             label: 'current_heading'.tr,
-            value: '${controller.heading.value.round()}\u00B0',
+            value: currentHeading == null
+                ? '\u2014'
+                : '${currentHeading.round()}\u00B0',
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _MetricCard(
             icon: Icons.mosque_rounded,
-            label: 'qibla_bearing'.tr,
+            label: currentHeading == null
+                ? 'qibla_from_north'.tr
+                : 'qibla_bearing'.tr,
             value: '${controller.qiblaBearing.value.round()}\u00B0',
           ),
         ),
       ],
-    ),
-  );
+    );
+  });
 }
 
 class _MetricCard extends StatelessWidget {

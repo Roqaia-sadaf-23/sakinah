@@ -61,6 +61,10 @@ class AppTranslations extends Translations {
     'facing_qibla': 'You are facing the Qibla',
     'compass_guidance':
         'Hold your phone flat and keep it away from metal objects.',
+    'qibla_calibrating':
+        'Move your phone in a figure-eight motion to calibrate the compass.',
+    'qibla_from_north': 'Qibla direction from North',
+    'cached_location': 'Using saved location',
     'loading_qibla': 'Preparing the Qibla compass...',
     'compass_unavailable':
         'A compass sensor is not available on this device. You can still use the Qibla bearing shown for your location.',
@@ -192,6 +196,9 @@ class AppTranslations extends Translations {
     'turn_slightly_left': 'استدر قليلاً إلى اليسار',
     'facing_qibla': 'أنت الآن باتجاه القبلة',
     'compass_guidance': 'أمسك الهاتف بشكل مستوٍ وأبعده عن الأجسام المعدنية.',
+    'qibla_calibrating': 'حرك الهاتف على شكل رقم 8 لمعايرة البوصلة.',
+    'qibla_from_north': 'اتجاه القبلة من الشمال',
+    'cached_location': 'يتم استخدام الموقع المحفوظ',
     'loading_qibla': 'جارٍ تجهيز بوصلة القبلة…',
     'compass_unavailable':
         'لا يتوفر مستشعر بوصلة على هذا الجهاز. لا يزال بإمكانك استخدام زاوية القبلة المعروضة لموقعك.',

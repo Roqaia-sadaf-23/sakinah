@@ -64,7 +64,10 @@ class HomeBinding extends Bindings {
     );
 
     Get.lazyPut<PrayerTrackerController>(
-      () => PrayerTrackerController(Get.find<PrayerTrackerRepository>()),
+      () => PrayerTrackerController(
+        Get.find<PrayerTrackerRepository>(),
+        Get.find<PrayerTimesController>(),
+      ),
     );
   }
 }

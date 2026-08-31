@@ -76,34 +76,42 @@ class PrayerTrackerCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final spacing = constraints.maxWidth < 390 ? 5.0 : 8.0;
-                final totalSpacing = spacing * 4;
-                if (!constraints.hasBoundedWidth ||
-                    constraints.maxWidth <= totalSpacing) {
-                  return const SizedBox.shrink();
-                }
-                final width =
-                    (constraints.maxWidth - totalSpacing) /
-                    PrayerTrackerController.prayers.length;
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: PrayerTrackerController.prayers
-                      .map(
-                        (prayer) => SizedBox(
-                          width: width,
-                          child: _PrayerCheck(
-                            label: prayer.key.tr,
-                            checked: controller.isCompleted(prayer),
-                            onTap: () => controller.toggle(prayer),
+            Obx(() {
+              final availability = {
+                for (final prayer in PrayerTrackerController.prayers)
+                  prayer: controller.canMarkPrayer(prayer),
+              };
+
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final spacing = constraints.maxWidth < 390 ? 5.0 : 8.0;
+                  final totalSpacing = spacing * 4;
+                  if (!constraints.hasBoundedWidth ||
+                      constraints.maxWidth <= totalSpacing) {
+                    return const SizedBox.shrink();
+                  }
+                  final width =
+                      (constraints.maxWidth - totalSpacing) /
+                      PrayerTrackerController.prayers.length;
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: PrayerTrackerController.prayers
+                        .map(
+                          (prayer) => SizedBox(
+                            width: width,
+                            child: _PrayerCheck(
+                              label: prayer.key.tr,
+                              checked: controller.isCompleted(prayer),
+                              available: availability[prayer] ?? false,
+                              onTap: () => controller.toggle(prayer),
+                            ),
                           ),
-                        ),
-                      )
-                      .toList(growable: false),
-                );
-              },
-            ),
+                        )
+                        .toList(growable: false),
+                  );
+                },
+              );
+            }),
           ],
         ),
       ),
@@ -115,64 +123,82 @@ class _PrayerCheck extends StatelessWidget {
   const _PrayerCheck({
     required this.label,
     required this.checked,
+    required this.available,
     required this.onTap,
   });
 
   final String label;
   final bool checked;
+  final bool available;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    checked: checked,
-    label: label,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: checked
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: checked
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.outline,
+  Widget build(BuildContext context) {
+    final enabled = checked || available;
+    final colors = Theme.of(context).colorScheme;
+
+    return Semantics(
+      button: true,
+      checked: checked,
+      enabled: enabled,
+      label: label,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 220),
+        opacity: enabled ? 1 : 0.48,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: checked ? colors.primary : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: checked
+                          ? colors.primary
+                          : available
+                          ? colors.outline
+                          : colors.outlineVariant,
+                    ),
+                  ),
+                  child: checked
+                      ? const Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        )
+                      : available
+                      ? null
+                      : Icon(
+                          Icons.lock_clock_rounded,
+                          color: colors.onSurfaceVariant,
+                          size: 17,
+                        ),
                 ),
-              ),
-              child: checked
-                  ? const Icon(
-                      Icons.check_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    )
-                  : null,
-            ),
-            const SizedBox(height: 7),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: 7),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
