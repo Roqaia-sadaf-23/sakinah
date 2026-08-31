@@ -88,6 +88,7 @@ class QuranAudioController extends GetxController {
 
     final requestId = ++_requestId;
     await _player.stop();
+    if (requestId != _requestId) return;
     currentSurah.value = surah;
     currentAyah.value = ayah;
     errorKey.value = '';

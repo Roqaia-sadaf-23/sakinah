@@ -45,6 +45,22 @@ void main() {
     expect(player.playedUrls, hasLength(1));
   });
 
+  test('tapping another Ayah stops before playing the new selection', () async {
+    final player = _FakeQuranAudioPlayer();
+    final controller = QuranAudioController(_AudioTestRepository(), player)
+      ..onInit();
+    addTearDown(controller.onClose);
+
+    await controller.playAyah(_surah, _surah.ayahs.first);
+    await controller.playAyah(_surah, _surah.ayahs[1]);
+
+    expect(player.stopCalls, 2);
+    expect(player.playedUrls, hasLength(2));
+    expect(player.playedUrls.last, endsWith('/ar.alafasy/2.mp3'));
+    expect(controller.currentAyah.value?.numberInSurah, 2);
+    expect(controller.playbackState.value, QuranPlaybackState.playing);
+  });
+
   test('changing reciter stops playback and persists the selection', () async {
     final repository = _AudioTestRepository();
     final player = _FakeQuranAudioPlayer();

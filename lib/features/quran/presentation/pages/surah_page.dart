@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah.dart';
 import '../controllers/quran_audio_controller.dart';
 import '../controllers/quran_controller.dart';
@@ -29,7 +28,6 @@ class _SurahPageState extends State<SurahPage> {
   late final QuranReaderController _readerController;
   late final int _surahNumber;
   late final int _initialAyahNumber;
-  late final Worker _currentAyahWorker;
   late final Worker _readingModeWorker;
   final ScrollController _scrollController = ScrollController();
   final Map<int, GlobalKey> _ayahKeys = <int, GlobalKey>{};
@@ -42,9 +40,6 @@ class _SurahPageState extends State<SurahPage> {
     _quranController = Get.find<QuranController>();
     _audioController = Get.find<QuranAudioController>();
     _readerController = Get.find<QuranReaderController>();
-    _currentAyahWorker = ever<Ayah?>(_audioController.currentAyah, (ayah) {
-      if (ayah != null) _scheduleAyahScroll(ayah.numberInSurah);
-    });
     _readingModeWorker = ever<QuranReadingMode>(
       _readerController.readingMode,
       (_) => _scheduleCurrentOrSavedAyahScroll(),
@@ -182,7 +177,6 @@ class _SurahPageState extends State<SurahPage> {
     if (Get.isRegistered<QuranAudioController>()) {
       unawaited(_audioController.stop());
     }
-    _currentAyahWorker.dispose();
     _readingModeWorker.dispose();
     _scrollController.dispose();
     super.dispose();

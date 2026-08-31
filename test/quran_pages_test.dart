@@ -70,6 +70,15 @@ void main() {
     expect(find.byType(AyahCard), findsNothing);
     expect(tester.takeException(), isNull);
 
+    final routeBeforeTap = Get.currentRoute;
+    final scrollView = tester.widget<CustomScrollView>(
+      find.byType(CustomScrollView),
+    );
+    final scrollController = scrollView.controller!;
+    scrollController.jumpTo(scrollController.position.maxScrollExtent * 0.6);
+    await tester.pump();
+    final offsetBeforeTap = scrollController.offset;
+
     final richText = tester.widget<RichText>(
       find.descendant(
         of: find.byKey(const Key('quran-continuous-text')),
@@ -86,6 +95,8 @@ void main() {
     expect(controllers.audio.currentAyah.value?.numberInSurah, 2);
     expect(controllers.player.playedUrls.single, endsWith('/2.mp3'));
     expect(find.byType(QuranReadingView, skipOffstage: false), findsOneWidget);
+    expect(Get.currentRoute, routeBeforeTap);
+    expect(scrollController.offset, moreOrLessEquals(offsetBeforeTap));
 
     final highlightedRichText = tester.widget<RichText>(
       find.descendant(
