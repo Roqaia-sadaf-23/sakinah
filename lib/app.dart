@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'core/localization/app_translations.dart';
 import 'core/routing/app_pages.dart';
 import 'core/routing/app_routes.dart';
+import 'core/routing/app_route_observer.dart';
 import 'core/storage/storage_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
@@ -37,6 +38,7 @@ class IslamicCompanionApp extends StatelessWidget {
 
         initialRoute: AppRoutes.home,
         getPages: AppPages.pages,
+        navigatorObservers: [appRouteObserver],
       ),
     );
   }

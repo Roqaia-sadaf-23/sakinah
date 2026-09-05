@@ -1,4 +1,4 @@
-package com.example.sakinah
+package com.roqaiaapps.sakinah
 
 import io.flutter.embedding.android.FlutterActivity
 

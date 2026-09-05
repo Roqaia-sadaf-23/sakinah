@@ -121,6 +121,7 @@ void main() {
       );
 
       expect(notifications.pending, hasLength(2));
+      expect(notifications.pending.keys.toSet(), hasLength(2));
       expect(notifications.cancelled, containsAll(notifications.pending.keys));
 
       await scheduler.settingsChanged(
@@ -133,6 +134,35 @@ void main() {
         storage.readJson(StorageKeys.prayerReminderScheduledIds)?['ids'],
         isEmpty,
       );
+    },
+  );
+
+  test(
+    'uses supported scheduling fallback when exact alarms are unavailable',
+    () async {
+      final storage = _MemoryStorageService();
+      final notifications = _FakeNotificationService()
+        ..exactAlarmsEnabled = false;
+      final scheduler = PrayerNotificationScheduler(
+        notifications,
+        storage,
+        now: (location) => tz.TZDateTime(location, 2026, 8, 30),
+      );
+      await storage.writeJson(
+        StorageKeys.prayerReminderSettings,
+        const PrayerReminderSettings(enabled: true).toJson(),
+      );
+
+      await scheduler.updateSchedules(
+        today: _schedule(prayers: [_prayer(PrayerName.fajr, 5, 10)]),
+        tomorrow: _schedule(
+          date: DateTime(2026, 8, 31),
+          prayers: [_prayer(PrayerName.fajr, 5, 11)],
+        ),
+        languageCode: 'en',
+      );
+
+      expect(notifications.pending, hasLength(2));
     },
   );
 }
@@ -166,6 +196,9 @@ class _FakeNotificationService implements NotificationService {
 
   @override
   Future<void> initialize() async {}
+
+  @override
+  Future<String> refreshLocalTimezone() async => 'UTC';
 
   @override
   Future<bool> areNotificationsEnabled() async => notificationsEnabled;

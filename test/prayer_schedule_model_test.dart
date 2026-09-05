@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sakinah/features/prayer_times/data/models/prayer_schedule_model.dart';
 import 'package:sakinah/features/prayer_times/domain/entities/prayer.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 void main() {
   group('PrayerScheduleModel', () {
@@ -55,10 +56,34 @@ void main() {
       final cached = PrayerScheduleModel.fromCache(original.toCache());
 
       expect(cached.schedule.isCached, isTrue);
-      expect(
-        cached.schedule.prayer(PrayerName.fajr).time,
-        DateTime(2026, 8, 10, 4, 28),
-      );
+      final fajr = cached.schedule.prayer(PrayerName.fajr).time;
+      expect(fajr.hour, 4);
+      expect(fajr.minute, 28);
+      expect((fajr as tz.TZDateTime).location.name, 'Asia/Riyadh');
+    });
+
+    test('prayer times retain the API timezone and absolute instant', () {
+      final model = PrayerScheduleModel.fromApi({
+        'timings': {
+          'Fajr': '04:28',
+          'Sunrise': '05:50',
+          'Dhuhr': '12:28',
+          'Asr': '15:48',
+          'Maghrib': '19:06',
+          'Isha': '20:36',
+        },
+        'date': {
+          'hijri': {
+            'day': '26',
+            'month': {'en': 'Safar', 'ar': 'صَفَر'},
+            'year': '1448',
+          },
+        },
+        'meta': {'timezone': 'Asia/Riyadh'},
+      }, DateTime(2026, 8, 10));
+
+      final fajr = model.schedule.prayer(PrayerName.fajr).time;
+      expect(fajr.difference(DateTime.utc(2026, 8, 10, 1, 28)), Duration.zero);
     });
   });
 }

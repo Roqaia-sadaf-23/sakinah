@@ -7,6 +7,8 @@ import '../../../prayer_times/presentation/controllers/prayer_reminder_controlle
 import '../../../prayer_times/presentation/widgets/prayer_reminder_settings_card.dart';
 import '../../../prayer_tracker/presentation/controllers/prayer_tracker_controller.dart';
 import '../widgets/home_header.dart';
+import '../widgets/home_banner.dart';
+import '../widgets/privacy_options_setting.dart';
 import '../widgets/home_loading.dart';
 import '../widgets/next_prayer_card.dart';
 import '../widgets/prayer_times_section.dart';
@@ -24,6 +26,7 @@ class HomePage extends GetView<PrayerTimesController> {
         ? Get.find<PrayerReminderController>()
         : null;
     return Scaffold(
+      bottomNavigationBar: const HomeBanner(),
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
@@ -52,6 +55,7 @@ class HomePage extends GetView<PrayerTimesController> {
                         children: [
                           HomeHeader(controller: prayerTimesController),
                           const SizedBox(height: 24),
+                          const PrivacyOptionsSetting(),
                           Obx(
                             () => _PrayerContent(
                               controller: prayerTimesController,

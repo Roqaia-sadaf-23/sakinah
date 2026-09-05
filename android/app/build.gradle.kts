@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,8 +7,18 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.isFile) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+val uploadKeystore = keystoreProperties.getProperty("storeFile")
+    ?.takeIf { it.isNotBlank() }
+    ?.let { rootProject.file(it) }
+
 android {
-    namespace = "com.example.sakinah"
+    namespace = "com.roqaiaapps.sakinah"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,8 +33,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.sakinah"
+        applicationId = "com.roqaiaapps.sakinah"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -32,13 +43,44 @@ android {
         multiDexEnabled = true
     }
 
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+            storeFile = uploadKeystore
+            storePassword = keystoreProperties.getProperty("storePassword")
+            storeType = "PKCS12"
         }
     }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+}
+
+// Debug builds remain available without secrets. Release must never fall back
+// to a debug key or silently produce an unsigned artifact.
+val validateUploadSigning = tasks.register("validateUploadSigning") {
+    doLast {
+        check(keystorePropertiesFile.isFile) {
+            "Release signing requires local android/key.properties."
+        }
+        listOf("storeFile", "storePassword", "keyAlias", "keyPassword").forEach {
+            check(!keystoreProperties.getProperty(it).isNullOrBlank()) {
+                "Missing release signing property: $it"
+            }
+        }
+        check(uploadKeystore?.isFile == true) {
+            "Release upload keystore is missing. Restore the local signing files."
+        }
+    }
+}
+tasks.matching {
+    it.name == "preReleaseBuild" || it.name == "validateSigningRelease"
+}.configureEach {
+    dependsOn(validateUploadSigning)
 }
 
 dependencies {

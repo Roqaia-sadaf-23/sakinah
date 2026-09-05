@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/notifications/notification_service.dart';
@@ -10,7 +11,8 @@ import '../services/prayer_notification_scheduler.dart';
 
 enum PrayerReminderPermissionIssue { notifications, exactAlarm, scheduling }
 
-class PrayerReminderController extends GetxController {
+class PrayerReminderController extends GetxController
+    with WidgetsBindingObserver {
   PrayerReminderController(this._storage, this._scheduler, this._notifications);
 
   final StorageService _storage;
@@ -28,6 +30,7 @@ class PrayerReminderController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this);
     settings.value = PrayerReminderSettings.fromJson(
       _storage.readJson(StorageKeys.prayerReminderSettings),
     );
@@ -74,8 +77,6 @@ class PrayerReminderController extends GetxController {
       }
       if (!exactAlarmsAllowed) {
         permissionIssue.value = PrayerReminderPermissionIssue.exactAlarm;
-        await _save(nextSettings.copyWith(enabled: false));
-        return;
       }
 
       nextSettings = nextSettings.copyWith(enabled: true);
@@ -86,7 +87,6 @@ class PrayerReminderController extends GetxController {
       );
     } catch (_) {
       permissionIssue.value = PrayerReminderPermissionIssue.scheduling;
-      await _save(settings.value.copyWith(enabled: false));
     } finally {
       isBusy.value = false;
     }
@@ -128,6 +128,28 @@ class PrayerReminderController extends GetxController {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !settings.value.enabled) return;
+    unawaited(_refreshAfterResume());
+  }
+
+  Future<void> _refreshAfterResume() async {
+    try {
+      await refreshPermissionState();
+      if (permissionIssue.value ==
+          PrayerReminderPermissionIssue.notifications) {
+        return;
+      }
+      await _scheduler.settingsChanged(
+        settings.value,
+        languageCode: Get.locale?.languageCode ?? 'en',
+      );
+    } catch (_) {
+      permissionIssue.value = PrayerReminderPermissionIssue.scheduling;
+    }
+  }
+
   Future<void> openRelevantSettings() async {
     isBusy.value = true;
     try {
@@ -148,5 +170,11 @@ class PrayerReminderController extends GetxController {
       StorageKeys.prayerReminderSettings,
       value.toJson(),
     );
+  }
+
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.onClose();
   }
 }

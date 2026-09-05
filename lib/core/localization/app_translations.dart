@@ -5,6 +5,10 @@ class AppTranslations extends Translations {
   Map<String, Map<String, String>> get keys => {'en': _english, 'ar': _arabic};
 
   static const _english = <String, String>{
+    'advertisement': 'Advertisement',
+    'privacy_options': 'Privacy options',
+    'privacy_options_error':
+        'Privacy options are unavailable. Please try again.',
     'app_name': 'Islamic Companion',
     'assalamu_alaikum': 'Assalamu Alaikum',
     'location_unknown': 'Your location',
@@ -188,6 +192,9 @@ class AppTranslations extends Translations {
   };
 
   static const _arabic = <String, String>{
+    'advertisement': 'إعلان',
+    'privacy_options': 'خيارات الخصوصية',
+    'privacy_options_error': 'تعذر فتح خيارات الخصوصية. يُرجى المحاولة مجددًا.',
     'qibla_direction': 'اتجاه القبلة',
     'loading_qibla_screen': 'جارٍ تجهيز بوصلة القبلة…',
     'current_heading': 'اتجاه الجهاز',

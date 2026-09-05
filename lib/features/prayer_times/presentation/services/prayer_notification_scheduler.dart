@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../core/notifications/notification_ids.dart';
 import '../../../../core/notifications/notification_service.dart';
 import '../../../../core/storage/storage_keys.dart';
 import '../../../../core/storage/storage_service.dart';
+import '../../../../core/utils/timezone_utils.dart';
 import '../../domain/entities/prayer.dart';
 import '../../domain/entities/prayer_reminder_settings.dart';
 import '../../domain/entities/prayer_schedule.dart';
@@ -90,24 +90,22 @@ class PrayerNotificationScheduler {
     PrayerReminderSettings settings, {
     required String languageCode,
   }) {
-    _ensureTimezoneDatabase();
+    TimezoneUtils.ensureInitialized();
     final plansById = <int, PrayerReminderPlan>{};
 
     for (final schedule in schedules) {
-      final location = _locationFor(schedule.timezone);
+      final location = TimezoneUtils.location(schedule.timezone);
       final now = _now(location);
 
       for (final prayer in schedule.prayers) {
         final slot = _slotFor(prayer.name);
         if (slot == null) continue;
 
-        final prayerTime = tz.TZDateTime(
-          location,
-          schedule.date.year,
-          schedule.date.month,
-          schedule.date.day,
-          prayer.time.hour,
-          prayer.time.minute,
+        final prayerTime = TimezoneUtils.atWallClock(
+          location: location,
+          date: schedule.date,
+          hour: prayer.time.hour,
+          minute: prayer.time.minute,
         );
         final reminderTime = prayerTime.subtract(
           Duration(minutes: settings.minutesBefore),
@@ -151,18 +149,49 @@ class PrayerNotificationScheduler {
     if (!settings.enabled || _schedules.isEmpty) return;
 
     await _notifications.initialize();
+    await _notifications.refreshLocalTimezone();
     final notificationsEnabled = await _notifications.areNotificationsEnabled();
-    final exactAlarmsEnabled = await _notifications
+    final exactSchedulingAvailable = await _notifications
         .canScheduleExactNotifications();
-    if (!notificationsEnabled || !exactAlarmsEnabled) return;
+    if (kDebugMode) {
+      debugPrint(
+        '[PrayerNotification] notificationsEnabled=$notificationsEnabled '
+        'exactSchedulingAvailable=$exactSchedulingAvailable',
+      );
+    }
+    if (!notificationsEnabled) return;
 
     final plans = buildPlans(_schedules, settings, languageCode: _languageCode);
-    await _storage.writeJson(StorageKeys.prayerReminderScheduledIds, {
-      'ids': plans.map((plan) => plan.id).toList(),
-    });
-
+    final scheduledIds = <int>[];
+    Object? firstFailure;
+    StackTrace? firstFailureStack;
     for (final plan in plans) {
-      await _notifications.schedule(plan.toRequest());
+      try {
+        await _notifications.schedule(plan.toRequest());
+        scheduledIds.add(plan.id);
+        if (kDebugMode) {
+          debugPrint(
+            '[PrayerNotification] Scheduled ${plan.prayerName.name} '
+            'id=${plan.id} at=${plan.scheduledDate} '
+            'timezone=${plan.scheduledDate.location.name}',
+          );
+        }
+      } catch (error, stackTrace) {
+        firstFailure ??= error;
+        firstFailureStack ??= stackTrace;
+        if (kDebugMode) {
+          debugPrint(
+            '[PrayerNotification] Scheduling failed for '
+            '${plan.prayerName.name} at=${plan.scheduledDate}: $error',
+          );
+        }
+      }
+    }
+    await _storage.writeJson(StorageKeys.prayerReminderScheduledIds, {
+      'ids': scheduledIds,
+    });
+    if (firstFailure != null) {
+      Error.throwWithStackTrace(firstFailure, firstFailureStack!);
     }
   }
 
@@ -190,24 +219,6 @@ class PrayerNotificationScheduler {
       },
     );
     return result;
-  }
-
-  static bool _timezoneDatabaseInitialized = false;
-
-  static void _ensureTimezoneDatabase() {
-    if (_timezoneDatabaseInitialized) return;
-    tz_data.initializeTimeZones();
-    _timezoneDatabaseInitialized = true;
-  }
-
-  static tz.Location _locationFor(String timezone) {
-    _ensureTimezoneDatabase();
-    if (timezone.isEmpty) return tz.local;
-    try {
-      return tz.getLocation(timezone);
-    } on tz.LocationNotFoundException {
-      return tz.local;
-    }
   }
 
   static int? _slotFor(PrayerName prayer) => switch (prayer) {

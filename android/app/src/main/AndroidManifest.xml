@@ -6,10 +6,14 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
+    <!-- AD_ID is merged once from play-services-ads-api; do not duplicate it. -->
     <application
         android:label="Sakinah"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-1088724215879441~9272828660" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

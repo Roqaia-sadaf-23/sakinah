@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/location/location_data.dart';
@@ -20,26 +21,52 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
     required LocationData location,
   }) async {
     final key = _cacheKey(date, location);
+    late final PrayerScheduleModel model;
     try {
-      final model = await _remoteDataSource.fetchSchedule(
+      model = await _remoteDataSource.fetchSchedule(
         date: date,
         latitude: location.latitude,
         longitude: location.longitude,
       );
-      await _storage.writeJson(key, model.toCache());
-      return model.schedule;
-    } catch (_) {
+    } catch (networkError) {
       final cached = _storage.readJson(key);
       if (cached != null) {
         try {
-          return PrayerScheduleModel.fromCache(cached).schedule;
-        } catch (_) {
+          final schedule = PrayerScheduleModel.fromCache(cached).schedule;
+          if (kDebugMode) {
+            debugPrint(
+              '[PrayerTime] Schedule ${_dateLabel(date)} source=cache '
+              '(network failed: $networkError)',
+            );
+          }
+          return schedule;
+        } catch (cacheError) {
+          if (kDebugMode) {
+            debugPrint('[PrayerTime] Invalid prayer cache: $cacheError');
+          }
           // The original data-source exception gives a more useful error.
         }
       }
       rethrow;
     }
+
+    try {
+      await _storage.writeJson(key, model.toCache());
+    } catch (cacheWriteError) {
+      if (kDebugMode) {
+        debugPrint(
+          '[PrayerTime] Could not cache fresh schedule: $cacheWriteError',
+        );
+      }
+    }
+    if (kDebugMode) {
+      debugPrint('[PrayerTime] Schedule ${_dateLabel(date)} source=network');
+    }
+    return model.schedule;
   }
+
+  static String _dateLabel(DateTime date) =>
+      DateFormat('yyyy-MM-dd').format(date);
 
   String _cacheKey(DateTime date, LocationData location) {
     final datePart = DateFormat('yyyy-MM-dd').format(date);

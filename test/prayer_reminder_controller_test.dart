@@ -59,6 +59,35 @@ void main() {
     );
   });
 
+  test(
+    'exact alarm denial keeps reminders enabled with fallback state',
+    () async {
+      final storage = _MemoryStorageService();
+      final notifications = _FakeNotificationService()
+        ..exactAlarmsEnabled = false;
+      final controller = PrayerReminderController(
+        storage,
+        PrayerNotificationScheduler(notifications, storage),
+        notifications,
+      )..onInit();
+      addTearDown(controller.onClose);
+
+      await controller.setEnabled(true);
+
+      expect(controller.isEnabled, isTrue);
+      expect(
+        controller.permissionIssue.value,
+        PrayerReminderPermissionIssue.exactAlarm,
+      );
+      expect(
+        PrayerReminderSettings.fromJson(
+          storage.readJson(StorageKeys.prayerReminderSettings),
+        ).enabled,
+        isTrue,
+      );
+    },
+  );
+
   testWidgets('settings card is constraint-safe on a narrow phone', (
     tester,
   ) async {
@@ -102,6 +131,9 @@ class _FakeNotificationService implements NotificationService {
 
   @override
   Future<void> initialize() async {}
+
+  @override
+  Future<String> refreshLocalTimezone() async => 'UTC';
 
   @override
   Future<bool> areNotificationsEnabled() async => notificationsEnabled;
