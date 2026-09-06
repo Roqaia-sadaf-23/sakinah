@@ -13,7 +13,6 @@ class NextPrayerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final prayer = controller.nextPrayer.value;
     return Container(
       constraints: const BoxConstraints(minHeight: 250),
       decoration: BoxDecoration(
@@ -36,12 +35,17 @@ class NextPrayerCard extends StatelessWidget {
             builder: (context, constraints) {
               final wide =
                   constraints.hasBoundedWidth && constraints.maxWidth >= 540;
-              final prayerInfo = _PrayerInfo(
-                name: prayer?.name.key.tr ?? '—',
-                time: prayer == null ? '—' : controller.formatTime(prayer.time),
-              );
-              final countdown = _Countdown(
-                value: controller.remaining.value.clock,
+              final prayerInfo = Obx(() {
+                final prayer = controller.nextPrayer.value;
+                return _PrayerInfo(
+                  name: prayer?.name.key.tr ?? '—',
+                  time: prayer == null
+                      ? '—'
+                      : controller.formatTime(prayer.time),
+                );
+              });
+              final countdown = Obx(
+                () => _Countdown(value: controller.remaining.value.clock),
               );
               if (wide) {
                 return Row(

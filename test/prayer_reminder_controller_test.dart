@@ -38,6 +38,55 @@ void main() {
     expect(persisted.type, PrayerReminderType.takbeer);
   });
 
+  test('saved reminder settings are restored on startup', () async {
+    final storage = _MemoryStorageService();
+    await storage.writeJson(
+      StorageKeys.prayerReminderSettings,
+      const PrayerReminderSettings(
+        enabled: true,
+        minutesBefore: 30,
+        type: PrayerReminderType.takbeer,
+        notificationPermissionRequested: true,
+      ).toJson(),
+    );
+    final notifications = _FakeNotificationService();
+    final controller = PrayerReminderController(
+      storage,
+      PrayerNotificationScheduler(notifications, storage),
+      notifications,
+    )..onInit();
+    addTearDown(controller.onClose);
+
+    expect(controller.isEnabled, isTrue);
+    expect(controller.minutesBefore, 30);
+    expect(controller.reminderType, PrayerReminderType.takbeer);
+  });
+
+  test('custom minutes accept 1 to 120 and reject invalid values', () async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final controller = PrayerReminderController(
+      storage,
+      PrayerNotificationScheduler(notifications, storage),
+      notifications,
+    )..onInit();
+    addTearDown(controller.onClose);
+
+    expect(await controller.setMinutesBefore(1), isTrue);
+    expect(controller.minutesBefore, 1);
+    expect(await controller.setMinutesBefore(120), isTrue);
+    expect(controller.minutesBefore, 120);
+    expect(await controller.setMinutesBefore(0), isFalse);
+    expect(await controller.setMinutesBefore(-10), isFalse);
+    expect(await controller.setMinutesBefore(121), isFalse);
+    expect(controller.minutesBefore, 120);
+
+    final restored = PrayerReminderSettings.fromJson(
+      storage.readJson(StorageKeys.prayerReminderSettings),
+    );
+    expect(restored.minutesBefore, 120);
+  });
+
   test('denied notification permission is not requested repeatedly', () async {
     final storage = _MemoryStorageService();
     final notifications = _FakeNotificationService()
@@ -121,6 +170,77 @@ void main() {
     expect(find.text('Takbeer'), findsOneWidget);
     expect(find.text('Text notification'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('reminder time sheet updates the card immediately', (
+    tester,
+  ) async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final controller = PrayerReminderController(
+      storage,
+      PrayerNotificationScheduler(notifications, storage),
+      notifications,
+    )..onInit();
+    addTearDown(controller.onClose);
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        translations: AppTranslations(),
+        locale: const Locale('en'),
+        home: Scaffold(
+          body: PrayerReminderSettingsCard(controller: controller),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Reminder time'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('15 minutes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('15 minutes before Adhan'), findsOneWidget);
+    expect(controller.minutesBefore, 15);
+    expect(
+      PrayerReminderSettings.fromJson(
+        storage.readJson(StorageKeys.prayerReminderSettings),
+      ).minutesBefore,
+      15,
+    );
+  });
+
+  testWidgets('custom reminder time rejects values outside 1 to 120', (
+    tester,
+  ) async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final controller = PrayerReminderController(
+      storage,
+      PrayerNotificationScheduler(notifications, storage),
+      notifications,
+    )..onInit();
+    addTearDown(controller.onClose);
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        translations: AppTranslations(),
+        locale: const Locale('en'),
+        home: Scaffold(
+          body: PrayerReminderSettingsCard(controller: controller),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Reminder time'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Custom'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '0');
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+
+    expect(find.text('Enter a whole number from 1 to 120.'), findsOneWidget);
+    expect(controller.minutesBefore, 5);
   });
 }
 

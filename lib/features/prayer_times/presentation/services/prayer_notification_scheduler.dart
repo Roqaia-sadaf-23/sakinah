@@ -24,6 +24,7 @@ class PrayerReminderPlan {
     required this.channelId,
     required this.channelName,
     required this.channelDescription,
+    this.androidSoundResource,
   });
 
   final int id;
@@ -34,6 +35,7 @@ class PrayerReminderPlan {
   final String channelId;
   final String channelName;
   final String channelDescription;
+  final String? androidSoundResource;
 
   LocalNotificationRequest toRequest() => LocalNotificationRequest(
     id: id,
@@ -44,6 +46,7 @@ class PrayerReminderPlan {
     channelName: channelName,
     channelDescription: channelDescription,
     payload: 'prayer-reminder:${prayerName.name}',
+    androidSoundResource: androidSoundResource,
   );
 }
 
@@ -114,7 +117,9 @@ class PrayerNotificationScheduler {
 
         final isArabic = languageCode == 'ar';
         final channelId = settings.type == PrayerReminderType.takbeer
-            ? 'prayer_reminders_takbeer_v1'
+            // v1 was previously created with the default sound. Android does
+            // not allow changing a channel's sound after it is created.
+            ? 'prayer_reminders_takbeer_v2'
             : 'prayer_reminders_text_v1';
         final id = NotificationIds.prayerReminder(
           date: schedule.date,
@@ -135,6 +140,9 @@ class PrayerNotificationScheduler {
           channelDescription: isArabic
               ? 'تنبيهات قبل مواقيت الصلاة'
               : 'Reminders before obligatory prayer times',
+          androidSoundResource: settings.type == PrayerReminderType.takbeer
+              ? 'takbeer_notification'
+              : null,
         );
       }
     }

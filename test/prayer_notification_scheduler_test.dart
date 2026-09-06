@@ -30,19 +30,60 @@ void main() {
       expect(plans.single.id, 202608304);
     });
 
-    test('does not schedule a reminder whose time has passed', () {
+    test('subtracts the selected minutes from the prayer time', () {
       final scheduler = _scheduler(
-        now: (location) => tz.TZDateTime(location, 2026, 8, 30, 18, 40),
+        now: (location) => tz.TZDateTime(location, 2026, 8, 30, 18),
       );
       final plans = scheduler.buildPlans(
         [
-          _schedule(prayers: [_prayer(PrayerName.maghrib, 18, 42)]),
+          _schedule(prayers: [_prayer(PrayerName.maghrib, 18, 36)]),
         ],
-        const PrayerReminderSettings(enabled: true),
+        const PrayerReminderSettings(enabled: true, minutesBefore: 15),
+        languageCode: 'en',
+      );
+
+      expect(
+        plans.single.scheduledDate,
+        tz.TZDateTime(tz.UTC, 2026, 8, 30, 18, 21),
+      );
+    });
+
+    test('does not schedule a reminder whose time has passed', () {
+      final scheduler = _scheduler(
+        now: (location) => tz.TZDateTime(location, 2026, 8, 30, 18, 30),
+      );
+      final plans = scheduler.buildPlans(
+        [
+          _schedule(prayers: [_prayer(PrayerName.maghrib, 18, 36)]),
+        ],
+        const PrayerReminderSettings(enabled: true, minutesBefore: 15),
         languageCode: 'en',
       );
 
       expect(plans, isEmpty);
+    });
+
+    test('Takbeer plans use the dedicated channel and raw sound', () {
+      final scheduler = _scheduler(
+        now: (location) => tz.TZDateTime(location, 2026, 8, 30, 18),
+      );
+      final plan = scheduler
+          .buildPlans(
+            [
+              _schedule(prayers: [_prayer(PrayerName.maghrib, 18, 36)]),
+            ],
+            const PrayerReminderSettings(
+              enabled: true,
+              minutesBefore: 15,
+              type: PrayerReminderType.takbeer,
+            ),
+            languageCode: 'en',
+          )
+          .single;
+
+      expect(plan.channelId, 'prayer_reminders_takbeer_v2');
+      expect(plan.androidSoundResource, 'takbeer_notification');
+      expect(plan.toRequest().androidSoundResource, 'takbeer_notification');
     });
 
     test('supports only the five obligatory prayers with stable IDs', () {
@@ -165,7 +206,149 @@ void main() {
       expect(notifications.pending, hasLength(2));
     },
   );
+
+  test('enabling schedules with the selected stored settings', () async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final scheduler = PrayerNotificationScheduler(
+      notifications,
+      storage,
+      now: (location) => tz.TZDateTime(location, 2026, 8, 30),
+    );
+    await storage.writeJson(
+      StorageKeys.prayerReminderSettings,
+      const PrayerReminderSettings(enabled: false, minutesBefore: 15).toJson(),
+    );
+    await scheduler.updateSchedules(
+      today: _schedule(prayers: [_prayer(PrayerName.fajr, 5, 10)]),
+      tomorrow: _schedule(
+        date: DateTime(2026, 8, 31),
+        prayers: [_prayer(PrayerName.fajr, 5, 11)],
+      ),
+      languageCode: 'en',
+    );
+
+    expect(notifications.pending, isEmpty);
+    await scheduler.settingsChanged(
+      const PrayerReminderSettings(enabled: true, minutesBefore: 15),
+      languageCode: 'en',
+    );
+
+    expect(notifications.pending, hasLength(2));
+    expect(notifications.pending[202608301]!.scheduledDate.hour, 4);
+    expect(notifications.pending[202608301]!.scheduledDate.minute, 55);
+  });
+
+  test('changing minutes replaces the existing prayer reminders', () async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final scheduler = PrayerNotificationScheduler(
+      notifications,
+      storage,
+      now: (location) => tz.TZDateTime(location, 2026, 8, 30),
+    );
+    await storage.writeJson(
+      StorageKeys.prayerReminderSettings,
+      const PrayerReminderSettings(enabled: true).toJson(),
+    );
+    await scheduler.updateSchedules(
+      today: _schedule(prayers: [_prayer(PrayerName.fajr, 5, 10)]),
+      tomorrow: _schedule(
+        date: DateTime(2026, 8, 31),
+        prayers: [_prayer(PrayerName.fajr, 5, 11)],
+      ),
+      languageCode: 'en',
+    );
+
+    expect(notifications.pending[202608301]!.scheduledDate.minute, 5);
+    await scheduler.settingsChanged(
+      const PrayerReminderSettings(enabled: true, minutesBefore: 15),
+      languageCode: 'en',
+    );
+
+    expect(notifications.pending, hasLength(2));
+    expect(notifications.pending[202608301]!.scheduledDate.minute, 55);
+    expect(notifications.cancelled, contains(202608301));
+    expect(notifications.cancelled, contains(202608311));
+  });
+
+  test('changing to Takbeer replaces requests with Takbeer sound', () async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final scheduler = PrayerNotificationScheduler(
+      notifications,
+      storage,
+      now: (location) => tz.TZDateTime(location, 2026, 8, 30),
+    );
+    await storage.writeJson(
+      StorageKeys.prayerReminderSettings,
+      const PrayerReminderSettings(enabled: true).toJson(),
+    );
+    await scheduler.updateSchedules(
+      today: _schedule(prayers: [_prayer(PrayerName.fajr, 5, 10)]),
+      tomorrow: _schedule(
+        date: DateTime(2026, 8, 31),
+        prayers: [_prayer(PrayerName.fajr, 5, 11)],
+      ),
+      languageCode: 'en',
+    );
+
+    expect(notifications.pending[202608301]!.androidSoundResource, isNull);
+    await scheduler.settingsChanged(
+      const PrayerReminderSettings(
+        enabled: true,
+        type: PrayerReminderType.takbeer,
+      ),
+      languageCode: 'en',
+    );
+
+    expect(
+      notifications.pending.values,
+      everyElement(
+        isA<LocalNotificationRequest>()
+            .having(
+              (request) => request.channelId,
+              'channelId',
+              'prayer_reminders_takbeer_v2',
+            )
+            .having(
+              (request) => request.androidSoundResource,
+              'androidSoundResource',
+              'takbeer_notification',
+            ),
+      ),
+    );
+  });
+
+  test('cancelling prayer reminders leaves unrelated notifications', () async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final scheduler = PrayerNotificationScheduler(notifications, storage);
+    notifications.pending[999] = _unrelatedRequest();
+    notifications.pending[202608301] = _unrelatedRequest(id: 202608301);
+    await storage.writeJson(StorageKeys.prayerReminderScheduledIds, {
+      'ids': <int>[202608301],
+    });
+
+    await scheduler.cancelPrayerReminders();
+
+    expect(notifications.pending, contains(999));
+    expect(notifications.pending, isNot(contains(202608301)));
+    expect(notifications.cancelled, [202608301]);
+  });
 }
+
+LocalNotificationRequest _unrelatedRequest({int id = 999}) =>
+    LocalNotificationRequest(
+      id: id,
+      title: 'Other',
+      body: 'Other notification',
+      scheduledDate: tz.TZDateTime(tz.UTC, 2026, 9, 1),
+      channelId: 'other',
+      channelName: 'Other',
+      channelDescription: 'Other notifications',
+      payload: 'other',
+    );
 
 PrayerNotificationScheduler _scheduler({required PrayerReminderNow now}) =>
     PrayerNotificationScheduler(

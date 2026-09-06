@@ -99,12 +99,39 @@ class PrayerReminderController extends GetxController
     try {
       final updated = settings.value.copyWith(type: type);
       await _save(updated);
-      await _scheduler.settingsChanged(
-        updated,
-        languageCode: Get.locale?.languageCode ?? 'en',
-      );
+      if (updated.enabled) {
+        await _scheduler.settingsChanged(
+          updated,
+          languageCode: Get.locale?.languageCode ?? 'en',
+        );
+      }
     } catch (_) {
       permissionIssue.value = PrayerReminderPermissionIssue.scheduling;
+    } finally {
+      isBusy.value = false;
+    }
+  }
+
+  Future<bool> setMinutesBefore(int minutes) async {
+    if (!PrayerReminderSettings.isValidMinutes(minutes)) return false;
+    if (isBusy.value) return false;
+    if (settings.value.minutesBefore == minutes) return true;
+
+    isBusy.value = true;
+    permissionIssue.value = null;
+    try {
+      final updated = settings.value.copyWith(minutesBefore: minutes);
+      await _save(updated);
+      if (updated.enabled) {
+        await _scheduler.settingsChanged(
+          updated,
+          languageCode: Get.locale?.languageCode ?? 'en',
+        );
+      }
+      return true;
+    } catch (_) {
+      permissionIssue.value = PrayerReminderPermissionIssue.scheduling;
+      return false;
     } finally {
       isBusy.value = false;
     }

@@ -20,6 +20,7 @@ class LocalNotificationRequest {
     required this.channelName,
     required this.channelDescription,
     required this.payload,
+    this.androidSoundResource,
   });
 
   final int id;
@@ -30,6 +31,7 @@ class LocalNotificationRequest {
   final String channelName;
   final String channelDescription;
   final String payload;
+  final String? androidSoundResource;
 }
 
 abstract class NotificationService {
@@ -182,9 +184,6 @@ class FlutterLocalNotificationService implements NotificationService {
   Future<void> schedule(LocalNotificationRequest request) async {
     await initialize();
 
-    // A verified short Takbeer can later be placed in
-    // android/app/src/main/res/raw and wired to the dedicated Takbeer channel.
-    // Until then both reminder channels intentionally use the system sound.
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
         request.channelId,
@@ -194,6 +193,11 @@ class FlutterLocalNotificationService implements NotificationService {
         priority: Priority.high,
         category: AndroidNotificationCategory.reminder,
         playSound: true,
+        sound: request.androidSoundResource == null
+            ? null
+            : RawResourceAndroidNotificationSound(
+                request.androidSoundResource!,
+              ),
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,

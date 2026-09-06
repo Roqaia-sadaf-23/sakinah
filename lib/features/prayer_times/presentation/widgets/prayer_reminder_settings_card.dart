@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../domain/entities/prayer_reminder_settings.dart';
@@ -8,6 +9,20 @@ class PrayerReminderSettingsCard extends StatelessWidget {
   const PrayerReminderSettingsCard({required this.controller, super.key});
 
   final PrayerReminderController controller;
+
+  Future<void> _selectReminderTime(BuildContext context) async {
+    final minutes = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => _ReminderTimeSheet(
+        currentMinutes: controller.settings.value.minutesBefore,
+      ),
+    );
+    if (minutes != null) {
+      await controller.setMinutesBefore(minutes);
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Obx(() {
@@ -65,36 +80,46 @@ class PrayerReminderSettingsCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.55,
-                ),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
                 borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.schedule_rounded, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('reminder_time'.tr),
-                        const SizedBox(height: 2),
-                        Text(
-                          'minutes_before_prayer'.trParams({
-                            'minutes': '${settings.minutesBefore}',
-                          }),
-                          style: Theme.of(context).textTheme.labelLarge,
-                        ),
-                      ],
-                    ),
+                onTap: busy ? null : () => _selectReminderTime(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
                   ),
-                ],
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.55,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.schedule_rounded, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('reminder_time'.tr),
+                            const SizedBox(height: 2),
+                            Text(
+                              'minutes_before_prayer'.trParams({
+                                'minutes': '${settings.minutesBefore}',
+                              }),
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -138,7 +163,7 @@ class PrayerReminderSettingsCard extends StatelessWidget {
             if (settings.type == PrayerReminderType.takbeer) ...[
               const SizedBox(height: 10),
               Text(
-                'takbeer_sound_pending'.tr,
+                'takbeer_sound_description'.tr,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -164,6 +189,118 @@ class PrayerReminderSettingsCard extends StatelessWidget {
       ),
     );
   });
+}
+
+class _ReminderTimeSheet extends StatefulWidget {
+  const _ReminderTimeSheet({required this.currentMinutes});
+
+  final int currentMinutes;
+
+  @override
+  State<_ReminderTimeSheet> createState() => _ReminderTimeSheetState();
+}
+
+class _ReminderTimeSheetState extends State<_ReminderTimeSheet> {
+  late final TextEditingController _customController;
+  bool _showCustom = false;
+  String? _customError;
+
+  @override
+  void initState() {
+    super.initState();
+    _showCustom = !PrayerReminderSettings.presetMinutes.contains(
+      widget.currentMinutes,
+    );
+    _customController = TextEditingController(
+      text: _showCustom ? '${widget.currentMinutes}' : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _customController.dispose();
+    super.dispose();
+  }
+
+  void _submitCustom() {
+    final minutes = int.tryParse(_customController.text.trim());
+    if (minutes == null || !PrayerReminderSettings.isValidMinutes(minutes)) {
+      setState(() => _customError = 'reminder_minutes_range'.tr);
+      return;
+    }
+    Navigator.of(context).pop(minutes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(24, 20, 24, bottomInset + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'select_reminder_time'.tr,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          for (final minutes in PrayerReminderSettings.presetMinutes)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                'reminder_minutes_option'.trParams({'minutes': '$minutes'}),
+              ),
+              trailing: widget.currentMinutes == minutes
+                  ? Icon(
+                      Icons.check_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
+                  : null,
+              onTap: () => Navigator.of(context).pop(minutes),
+            ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('custom_reminder_time'.tr),
+            trailing: _showCustom
+                ? Icon(
+                    Icons.check_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  )
+                : null,
+            onTap: () => setState(() {
+              _showCustom = true;
+              _customError = null;
+            }),
+          ),
+          if (_showCustom) ...[
+            const SizedBox(height: 4),
+            TextField(
+              controller: _customController,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: 'custom_minutes_label'.tr,
+                hintText: 'custom_minutes_hint'.tr,
+                errorText: _customError,
+              ),
+              onChanged: (_) {
+                if (_customError != null) {
+                  setState(() => _customError = null);
+                }
+              },
+              onSubmitted: (_) => _submitCustom(),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: _submitCustom, child: Text('save'.tr)),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _PermissionWarning extends StatelessWidget {

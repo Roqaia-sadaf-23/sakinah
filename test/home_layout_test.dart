@@ -70,6 +70,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'NextPrayerCard countdown reacts to every remaining-time update',
+    (tester) async {
+      final controller = _TestPrayerTimesController(_MemoryStorageService());
+      _setSuccessfulSchedule(controller);
+
+      await tester.pumpWidget(_testApp(NextPrayerCard(controller: controller)));
+
+      expect(find.text('02:15:00'), findsOneWidget);
+
+      controller.remaining.value = const Duration(
+        hours: 2,
+        minutes: 14,
+        seconds: 59,
+      );
+      await tester.pump();
+
+      expect(find.text('02:15:00'), findsNothing);
+      expect(find.text('02:14:59'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Quran quick action navigates to the configured route', (
     tester,
   ) async {

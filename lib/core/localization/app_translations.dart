@@ -149,16 +149,23 @@ class AppTranslations extends Translations {
     'prayer_reminders': 'Prayer reminders',
     'prayer_reminders_subtitle': 'A gentle notice before each prayer',
     'reminder_time': 'Reminder time',
-    'minutes_before_prayer': '@minutes minutes before prayer',
+    'minutes_before_prayer': '@minutes minutes before Adhan',
+    'select_reminder_time': 'Choose reminder time',
+    'reminder_minutes_option': '@minutes minutes',
+    'custom_reminder_time': 'Custom',
+    'custom_minutes_label': 'Minutes before Adhan',
+    'custom_minutes_hint': '1 to 120',
+    'reminder_minutes_range': 'Enter a whole number from 1 to 120.',
+    'save': 'Save',
     'reminder_type': 'Reminder type',
     'reminder_takbeer': 'Takbeer',
     'reminder_text': 'Text notification',
-    'takbeer_sound_pending':
-        'The default notification sound is used until a verified short Takbeer sound is added.',
+    'takbeer_sound_description':
+        'A short Takbeer sound will play with the reminder.',
     'notification_permission_denied':
         'Notifications are disabled for Sakinah. Enable them in system settings to receive prayer reminders.',
     'exact_alarm_permission_denied':
-        'Exact alarms are disabled. Allow exact alarms so reminders can arrive precisely five minutes before prayer.',
+        'Exact alarms are disabled. Allow exact alarms so reminders can arrive at the selected time.',
     'notification_scheduling_error':
         'Prayer reminders could not be scheduled. Check notification settings and try again.',
     'fajr_reminder': 'Fajr prayer is in 5 minutes',
@@ -328,15 +335,21 @@ class AppTranslations extends Translations {
     'prayer_reminders_subtitle': 'تنبيه لطيف قبل كل صلاة',
     'reminder_time': 'وقت التذكير',
     'minutes_before_prayer': 'قبل الأذان بـ @minutes دقائق',
+    'select_reminder_time': 'اختر وقت التذكير',
+    'reminder_minutes_option': '@minutes دقائق',
+    'custom_reminder_time': 'مخصص',
+    'custom_minutes_label': 'الدقائق قبل الأذان',
+    'custom_minutes_hint': 'من 1 إلى 120',
+    'reminder_minutes_range': 'أدخل عددًا صحيحًا من 1 إلى 120.',
+    'save': 'حفظ',
     'reminder_type': 'نوع التنبيه',
     'reminder_takbeer': 'تكبير',
     'reminder_text': 'إشعار نصي',
-    'takbeer_sound_pending':
-        'يُستخدم صوت الإشعار الافتراضي حتى إضافة صوت تكبير قصير وموثّق الترخيص.',
+    'takbeer_sound_description': 'سيعمل صوت تكبير قصير مع التذكير.',
     'notification_permission_denied':
         'إشعارات سكينة معطّلة. فعّلها من إعدادات النظام لاستلام تذكيرات الصلاة.',
     'exact_alarm_permission_denied':
-        'التنبيهات الدقيقة معطّلة. اسمح بها ليصل التذكير قبل الصلاة بخمس دقائق تمامًا.',
+        'التنبيهات الدقيقة معطّلة. اسمح بها ليصل التذكير في الوقت المحدد.',
     'notification_scheduling_error':
         'تعذر جدولة تذكيرات الصلاة. تحقق من إعدادات الإشعارات وحاول مجددًا.',
     'fajr_reminder': 'أذان الفجر بعد قليل',

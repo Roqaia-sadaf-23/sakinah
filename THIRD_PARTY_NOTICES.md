@@ -1,5 +1,13 @@
 # Third-party notices
 
+## Takbeer notification sound
+
+`android/app/src/main/res/raw/takbeer_notification.mp3` is an MP3 transcode of
+“Allahuakbar.opus” by Wikimedia Commons user Bod lnga klang:
+<https://commons.wikimedia.org/wiki/File:Allahuakbar.opus>
+
+The source recording is dedicated to the public domain under CC0 1.0.
+
 ## Azkar data
 
 The files under `assets/data/azkar/` are bundled verbatim from these sources:

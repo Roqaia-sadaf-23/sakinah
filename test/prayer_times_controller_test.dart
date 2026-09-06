@@ -87,6 +87,89 @@ void main() {
     controller.onClose();
   });
 
+  test('one-second ticker recomputes from the real current time', () {
+    var current = DateTime.utc(2026, 8, 30, 13);
+    late _ManualTimer ticker;
+    final controller = _controller(
+      currentTime: () => current,
+      tickerFactory: (duration, callback) {
+        ticker = _ManualTimer(callback);
+        return ticker;
+      },
+    );
+    controller.todaySchedule.value = _schedule(DateTime(2026, 8, 30));
+    controller.tomorrowSchedule.value = _schedule(DateTime(2026, 8, 31));
+    controller.recomputeAt(current);
+    controller.onInit();
+
+    current = current.add(const Duration(seconds: 1));
+    ticker.fire();
+    expect(
+      controller.remaining.value,
+      const Duration(hours: 2, minutes: 29, seconds: 59),
+    );
+
+    // A single callback after a nine-second clock jump must subtract all nine
+    // seconds, proving the value is derived from DateTime rather than decremented.
+    current = current.add(const Duration(seconds: 9));
+    ticker.fire();
+    expect(
+      controller.remaining.value,
+      const Duration(hours: 2, minutes: 29, seconds: 50),
+    );
+
+    controller.onClose();
+  });
+
+  test('ticker switches to the following prayer when a prayer begins', () {
+    var current = DateTime.utc(2026, 8, 30, 11, 59, 59);
+    late _ManualTimer ticker;
+    final controller = _controller(
+      currentTime: () => current,
+      tickerFactory: (duration, callback) {
+        ticker = _ManualTimer(callback);
+        return ticker;
+      },
+    );
+    controller.todaySchedule.value = _schedule(DateTime(2026, 8, 30));
+    controller.tomorrowSchedule.value = _schedule(DateTime(2026, 8, 31));
+    controller.recomputeAt(current);
+    controller.onInit();
+    expect(controller.nextPrayer.value?.name, PrayerName.dhuhr);
+    expect(controller.remaining.value, const Duration(seconds: 1));
+
+    current = current.add(const Duration(seconds: 1));
+    ticker.fire();
+
+    expect(controller.nextPrayer.value?.name, PrayerName.asr);
+    expect(controller.remaining.value, const Duration(hours: 3, minutes: 30));
+    controller.onClose();
+  });
+
+  test('ticker switches from Isha to next-day Fajr', () {
+    var current = DateTime.utc(2026, 8, 30, 19, 59, 59);
+    late _ManualTimer ticker;
+    final controller = _controller(
+      currentTime: () => current,
+      tickerFactory: (duration, callback) {
+        ticker = _ManualTimer(callback);
+        return ticker;
+      },
+    );
+    controller.todaySchedule.value = _schedule(DateTime(2026, 8, 30));
+    controller.tomorrowSchedule.value = _schedule(DateTime(2026, 8, 31));
+    controller.recomputeAt(current);
+    controller.onInit();
+    expect(controller.nextPrayer.value?.name, PrayerName.isha);
+
+    current = current.add(const Duration(seconds: 1));
+    ticker.fire();
+
+    expect(controller.nextPrayer.value?.name, PrayerName.fajr);
+    expect(controller.remaining.value, const Duration(hours: 9));
+    controller.onClose();
+  });
+
   test('lifecycle changes never leave duplicate ticker timers', () {
     final timers = <_TrackingTimer>[];
     final controller = _controller(
@@ -202,6 +285,29 @@ class _TrackingTimer implements Timer {
 
   @override
   int get tick => 0;
+
+  @override
+  void cancel() => _active = false;
+}
+
+class _ManualTimer implements Timer {
+  _ManualTimer(this._callback);
+
+  final void Function(Timer timer) _callback;
+  bool _active = true;
+  int _tick = 0;
+
+  void fire() {
+    if (!_active) return;
+    _tick++;
+    _callback(this);
+  }
+
+  @override
+  bool get isActive => _active;
+
+  @override
+  int get tick => _tick;
 
   @override
   void cancel() => _active = false;

@@ -10,12 +10,18 @@ class PrayerReminderSettings {
   });
 
   static const defaults = PrayerReminderSettings();
+  static const minMinutesBefore = 1;
+  static const maxMinutesBefore = 120;
+  static const presetMinutes = <int>[5, 10, 15, 20, 30];
 
   final bool enabled;
   final int minutesBefore;
   final PrayerReminderType type;
   final bool notificationPermissionRequested;
   final bool exactAlarmPermissionRequested;
+
+  static bool isValidMinutes(int minutes) =>
+      minutes >= minMinutesBefore && minutes <= maxMinutesBefore;
 
   PrayerReminderSettings copyWith({
     bool? enabled,
@@ -39,7 +45,7 @@ class PrayerReminderSettings {
     final minutes = storedMinutes is num ? storedMinutes.toInt() : 5;
     return PrayerReminderSettings(
       enabled: json['enabled'] == true,
-      minutesBefore: minutes > 0 && minutes <= 60 ? minutes : 5,
+      minutesBefore: isValidMinutes(minutes) ? minutes : 5,
       type: json['type'] == PrayerReminderType.takbeer.name
           ? PrayerReminderType.takbeer
           : PrayerReminderType.text,
