@@ -7,6 +7,7 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../utils/timezone_utils.dart';
+import 'prayer_notification_channels.dart';
 
 enum NotificationPermissionState { granted, denied, unsupported }
 
@@ -79,6 +80,15 @@ class FlutterLocalNotificationService implements NotificationService {
         ),
       ),
     );
+
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      final android = _android;
+      if (android != null) {
+        for (final channel in PrayerNotificationChannels.all) {
+          await android.createNotificationChannel(channel);
+        }
+      }
+    }
   }
 
   @override
@@ -185,19 +195,11 @@ class FlutterLocalNotificationService implements NotificationService {
     await initialize();
 
     final details = NotificationDetails(
-      android: AndroidNotificationDetails(
+      android: PrayerNotificationChannels.detailsFor(
         request.channelId,
-        request.channelName,
+        channelName: request.channelName,
         channelDescription: request.channelDescription,
-        importance: Importance.high,
-        priority: Priority.high,
-        category: AndroidNotificationCategory.reminder,
-        playSound: true,
-        sound: request.androidSoundResource == null
-            ? null
-            : RawResourceAndroidNotificationSound(
-                request.androidSoundResource!,
-              ),
+        androidSoundResource: request.androidSoundResource,
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,

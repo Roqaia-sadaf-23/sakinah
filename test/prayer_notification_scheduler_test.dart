@@ -1,5 +1,7 @@
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sakinah/core/notifications/notification_ids.dart';
+import 'package:sakinah/core/notifications/prayer_notification_channels.dart';
 import 'package:sakinah/core/notifications/notification_service.dart';
 import 'package:sakinah/core/storage/storage_keys.dart';
 import 'package:sakinah/core/storage/storage_service.dart';
@@ -86,6 +88,24 @@ void main() {
       expect(plan.toRequest().androidSoundResource, 'takbeer_notification');
     });
 
+    test('normal plans use the dedicated default-sound channel', () {
+      final scheduler = _scheduler(
+        now: (location) => tz.TZDateTime(location, 2026, 8, 30, 18),
+      );
+      final plan = scheduler
+          .buildPlans(
+            [
+              _schedule(prayers: [_prayer(PrayerName.maghrib, 18, 36)]),
+            ],
+            const PrayerReminderSettings(enabled: true, minutesBefore: 15),
+            languageCode: 'en',
+          )
+          .single;
+
+      expect(plan.channelId, 'prayer_reminders_default_v2');
+      expect(plan.androidSoundResource, isNull);
+    });
+
     test('supports only the five obligatory prayers with stable IDs', () {
       final scheduler = _scheduler(
         now: (location) => tz.TZDateTime(location, 2026, 8, 30),
@@ -127,6 +147,58 @@ void main() {
         ),
         202608304,
       );
+    });
+  });
+
+  group('Android prayer notification channels', () {
+    test('both channels are configured to play sound', () {
+      expect(PrayerNotificationChannels.defaultChannel.playSound, isTrue);
+      expect(PrayerNotificationChannels.takbeerChannel.playSound, isTrue);
+      expect(
+        PrayerNotificationChannels.all.map((channel) => channel.id),
+        containsAll(<String>[
+          'prayer_reminders_default_v2',
+          'prayer_reminders_takbeer_v2',
+        ]),
+      );
+    });
+
+    test('Takbeer channel and notification details use the raw sound', () {
+      expect(
+        PrayerNotificationChannels.takbeerChannel.sound,
+        isA<RawResourceAndroidNotificationSound>(),
+      );
+
+      final request = _unrelatedRequest(
+        channelId: PrayerNotificationChannels.takbeerId,
+        androidSoundResource: PrayerNotificationChannels.takbeerSoundResource,
+      );
+      final details = PrayerNotificationChannels.detailsFor(
+        request.channelId,
+        channelName: request.channelName,
+        channelDescription: request.channelDescription,
+        androidSoundResource: request.androidSoundResource,
+      );
+
+      expect(details.channelId, 'prayer_reminders_takbeer_v2');
+      expect(details.playSound, isTrue);
+      expect(details.sound, isA<RawResourceAndroidNotificationSound>());
+    });
+
+    test('normal notification details use the default-sound channel', () {
+      final request = _unrelatedRequest(
+        channelId: PrayerNotificationChannels.defaultId,
+      );
+      final details = PrayerNotificationChannels.detailsFor(
+        request.channelId,
+        channelName: request.channelName,
+        channelDescription: request.channelDescription,
+        androidSoundResource: request.androidSoundResource,
+      );
+
+      expect(details.channelId, 'prayer_reminders_default_v2');
+      expect(details.playSound, isTrue);
+      expect(details.sound, isNull);
     });
   });
 
@@ -338,17 +410,21 @@ void main() {
   });
 }
 
-LocalNotificationRequest _unrelatedRequest({int id = 999}) =>
-    LocalNotificationRequest(
-      id: id,
-      title: 'Other',
-      body: 'Other notification',
-      scheduledDate: tz.TZDateTime(tz.UTC, 2026, 9, 1),
-      channelId: 'other',
-      channelName: 'Other',
-      channelDescription: 'Other notifications',
-      payload: 'other',
-    );
+LocalNotificationRequest _unrelatedRequest({
+  int id = 999,
+  String channelId = 'other',
+  String? androidSoundResource,
+}) => LocalNotificationRequest(
+  id: id,
+  title: 'Other',
+  body: 'Other notification',
+  scheduledDate: tz.TZDateTime(tz.UTC, 2026, 9, 1),
+  channelId: channelId,
+  channelName: 'Other',
+  channelDescription: 'Other notifications',
+  payload: 'other',
+  androidSoundResource: androidSoundResource,
+);
 
 PrayerNotificationScheduler _scheduler({required PrayerReminderNow now}) =>
     PrayerNotificationScheduler(

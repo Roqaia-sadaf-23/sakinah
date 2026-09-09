@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../core/notifications/notification_ids.dart';
+import '../../../../core/notifications/prayer_notification_channels.dart';
 import '../../../../core/notifications/notification_service.dart';
 import '../../../../core/storage/storage_keys.dart';
 import '../../../../core/storage/storage_service.dart';
@@ -116,11 +117,7 @@ class PrayerNotificationScheduler {
         if (!reminderTime.isAfter(now)) continue;
 
         final isArabic = languageCode == 'ar';
-        final channelId = settings.type == PrayerReminderType.takbeer
-            // v1 was previously created with the default sound. Android does
-            // not allow changing a channel's sound after it is created.
-            ? 'prayer_reminders_takbeer_v2'
-            : 'prayer_reminders_text_v1';
+        final usesTakbeer = settings.type == PrayerReminderType.takbeer;
         final id = NotificationIds.prayerReminder(
           date: schedule.date,
           prayerSlot: slot,
@@ -135,13 +132,17 @@ class PrayerNotificationScheduler {
             isArabic: isArabic,
             minutes: settings.minutesBefore,
           ),
-          channelId: channelId,
-          channelName: isArabic ? 'تذكير الصلاة' : 'Prayer Reminders',
-          channelDescription: isArabic
-              ? 'تنبيهات قبل مواقيت الصلاة'
-              : 'Reminders before obligatory prayer times',
-          androidSoundResource: settings.type == PrayerReminderType.takbeer
-              ? 'takbeer_notification'
+          channelId: usesTakbeer
+              ? PrayerNotificationChannels.takbeerId
+              : PrayerNotificationChannels.defaultId,
+          channelName: usesTakbeer
+              ? PrayerNotificationChannels.takbeerName
+              : PrayerNotificationChannels.defaultName,
+          channelDescription: usesTakbeer
+              ? PrayerNotificationChannels.takbeerDescription
+              : PrayerNotificationChannels.defaultDescription,
+          androidSoundResource: usesTakbeer
+              ? PrayerNotificationChannels.takbeerSoundResource
               : null,
         );
       }
