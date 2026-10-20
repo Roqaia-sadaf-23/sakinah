@@ -22,6 +22,7 @@ class LocalNotificationRequest {
     required this.channelDescription,
     required this.payload,
     this.androidSoundResource,
+    this.playSound = true,
   });
 
   final int id;
@@ -33,6 +34,7 @@ class LocalNotificationRequest {
   final String channelDescription;
   final String payload;
   final String? androidSoundResource;
+  final bool playSound;
 }
 
 abstract class NotificationService {
@@ -200,11 +202,12 @@ class FlutterLocalNotificationService implements NotificationService {
         channelName: request.channelName,
         channelDescription: request.channelDescription,
         androidSoundResource: request.androidSoundResource,
+        playSound: request.playSound,
       ),
-      iOS: const DarwinNotificationDetails(
+      iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
+        presentSound: request.playSound,
       ),
     );
 

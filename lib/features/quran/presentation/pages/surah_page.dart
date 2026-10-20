@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/surah.dart';
+import '../../domain/repositories/mushaf_page_source.dart';
 import '../controllers/quran_audio_controller.dart';
 import '../controllers/quran_controller.dart';
 import '../controllers/quran_reader_controller.dart';
@@ -14,6 +15,7 @@ import '../widgets/quran_memorization_view.dart';
 import '../widgets/quran_reader_toolbar.dart';
 import '../widgets/quran_reading_view.dart';
 import '../widgets/quran_state_view.dart';
+import '../widgets/quran_text_style.dart';
 
 class SurahPage extends StatefulWidget {
   const SurahPage({super.key});
@@ -26,6 +28,7 @@ class _SurahPageState extends State<SurahPage> {
   late final QuranController _quranController;
   late final QuranAudioController _audioController;
   late final QuranReaderController _readerController;
+  late final MushafPageSource _pageSource;
   late final int _surahNumber;
   late final int _initialAyahNumber;
   late final Worker _readingModeWorker;
@@ -40,6 +43,7 @@ class _SurahPageState extends State<SurahPage> {
     _quranController = Get.find<QuranController>();
     _audioController = Get.find<QuranAudioController>();
     _readerController = Get.find<QuranReaderController>();
+    _pageSource = Get.find<MushafPageSource>();
     _readingModeWorker = ever<QuranReadingMode>(
       _readerController.readingMode,
       (_) => _scheduleCurrentOrSavedAyahScroll(),
@@ -80,11 +84,7 @@ class _SurahPageState extends State<SurahPage> {
         await WidgetsBinding.instance.endOfFrame;
         final readerState = _readingViewKey.currentState;
         if (readerState != null) {
-          await readerState.scrollAyahIntoView(
-            _initialAyahNumber,
-            _scrollController,
-            animate: false,
-          );
+          await readerState.showAyah(_initialAyahNumber, animate: false);
           return;
         }
       }
@@ -150,10 +150,7 @@ class _SurahPageState extends State<SurahPage> {
       if (!mounted) return;
       if (_readerController.readingMode.value == QuranReadingMode.reading) {
         unawaited(
-          _readingViewKey.currentState?.scrollAyahIntoView(
-                ayahNumber,
-                _scrollController,
-              ) ??
+          _readingViewKey.currentState?.showAyah(ayahNumber) ??
               Future<void>.value(),
         );
         return;
@@ -205,6 +202,7 @@ class _SurahPageState extends State<SurahPage> {
           quranController: _quranController,
           audioController: _audioController,
           readerController: _readerController,
+          pageSource: _pageSource,
           scrollController: _scrollController,
           ayahKeyFor: (number) => _ayahKeys.putIfAbsent(number, GlobalKey.new),
           readingViewKey: _readingViewKey,
@@ -219,6 +217,7 @@ class _SurahReader extends StatelessWidget {
     required this.quranController,
     required this.audioController,
     required this.readerController,
+    required this.pageSource,
     required this.scrollController,
     required this.ayahKeyFor,
     required this.readingViewKey,
@@ -229,68 +228,90 @@ class _SurahReader extends StatelessWidget {
   final QuranController quranController;
   final QuranAudioController audioController;
   final QuranReaderController readerController;
+  final MushafPageSource pageSource;
   final ScrollController scrollController;
   final GlobalKey Function(int number) ayahKeyFor;
   final GlobalKey<QuranReadingViewState> readingViewKey;
 
   @override
-  Widget build(BuildContext context) => CustomScrollView(
-    controller: scrollController,
-    physics: const BouncingScrollPhysics(),
-    slivers: [
-      SliverToBoxAdapter(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppConstants.maxContentWidth,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
-              child: _SurahHeader(
-                surah: surah,
-                initialAyahNumber: initialAyahNumber,
+  Widget build(BuildContext context) => Obx(() {
+    if (readerController.readingMode.value == QuranReadingMode.reading) {
+      return Column(
+        children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppConstants.maxContentWidth,
               ),
-            ),
-          ),
-        ),
-      ),
-      SliverToBoxAdapter(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: AppConstants.maxContentWidth,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-              child: QuranReaderToolbar(
-                readerController: readerController,
-                audioController: audioController,
-              ),
-            ),
-          ),
-        ),
-      ),
-      Obx(
-        () => readerController.readingMode.value == QuranReadingMode.reading
-            ? SliverToBoxAdapter(
-                child: QuranReadingView(
-                  key: readingViewKey,
-                  surah: surah,
-                  quranController: quranController,
-                  audioController: audioController,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                child: QuranReaderToolbar(
                   readerController: readerController,
+                  audioController: audioController,
                 ),
-              )
-            : QuranMemorizationView(
-                surah: surah,
-                quranController: quranController,
-                audioController: audioController,
-                readerController: readerController,
-                ayahKeyFor: ayahKeyFor,
               ),
-      ),
-    ],
-  );
+            ),
+          ),
+          Expanded(
+            child: QuranReadingView(
+              key: readingViewKey,
+              surah: surah,
+              initialAyahNumber: initialAyahNumber,
+              quranController: quranController,
+              audioController: audioController,
+              pageSource: pageSource,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return CustomScrollView(
+      controller: scrollController,
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppConstants.maxContentWidth,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 14),
+                child: _SurahHeader(
+                  surah: surah,
+                  initialAyahNumber: initialAyahNumber,
+                ),
+              ),
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppConstants.maxContentWidth,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                child: QuranReaderToolbar(
+                  readerController: readerController,
+                  audioController: audioController,
+                ),
+              ),
+            ),
+          ),
+        ),
+        QuranMemorizationView(
+          surah: surah,
+          quranController: quranController,
+          audioController: audioController,
+          readerController: readerController,
+          ayahKeyFor: ayahKeyFor,
+        ),
+      ],
+    );
+  });
 }
 
 class _SurahHeader extends StatelessWidget {
@@ -317,10 +338,14 @@ class _SurahHeader extends StatelessWidget {
           surah.arabicName,
           textAlign: TextAlign.center,
           textDirection: TextDirection.rtl,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+          locale: const Locale('ar'),
+          strutStyle: QuranTextStyle.strut(28),
+          textHeightBehavior: QuranTextStyle.textHeightBehavior,
+          style: QuranTextStyle.of(
             color: Colors.white,
             fontSize: 28,
-            height: 1.6,
+            fontWeight: FontWeight.w600,
+            height: 1.7,
           ),
         ),
         const SizedBox(height: 5),

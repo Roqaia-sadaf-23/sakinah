@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -124,49 +125,63 @@ class PrayerReminderSettingsCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'reminder_type'.tr,
+              'alarm_sound'.tr,
               style: Theme.of(context).textTheme.labelLarge,
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                ChoiceChip(
-                  avatar: const Icon(Icons.volume_up_outlined, size: 18),
-                  label: Text('reminder_takbeer'.tr),
-                  selected: settings.type == PrayerReminderType.takbeer,
-                  onSelected: busy
-                      ? null
-                      : (selected) {
-                          if (selected) {
-                            controller.setReminderType(
-                              PrayerReminderType.takbeer,
-                            );
-                          }
-                        },
-                ),
-                ChoiceChip(
-                  avatar: const Icon(Icons.message_outlined, size: 18),
-                  label: Text('reminder_text'.tr),
-                  selected: settings.type == PrayerReminderType.text,
-                  onSelected: busy
-                      ? null
-                      : (selected) {
-                          if (selected) {
-                            controller.setReminderType(PrayerReminderType.text);
-                          }
-                        },
-                ),
-              ],
+            const SizedBox(height: 4),
+            Text(
+              'alarm_sound_description'.tr,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
-            if (settings.type == PrayerReminderType.takbeer) ...[
-              const SizedBox(height: 10),
-              Text(
-                'takbeer_sound_description'.tr,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+            const SizedBox(height: 10),
+            for (final sound in PrayerAlarmSound.values) ...[
+              _AlarmSoundOption(
+                sound: sound,
+                selected: settings.alarmSound == sound,
+                enabled: !busy,
+                previewing: controller.previewingSound.value == sound,
+                onSelected: () => controller.setAlarmSound(sound),
+                onPreview: () async {
+                  final previewed = await controller.previewAlarmSound(sound);
+                  if (!context.mounted) return;
+                  final messageKey = !previewed
+                      ? 'alarm_preview_error'
+                      : sound == PrayerAlarmSound.silent
+                      ? 'alarm_silent_preview'
+                      : null;
+                  if (messageKey != null) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(messageKey.tr)));
+                  }
+                },
+              ),
+              if (sound != PrayerAlarmSound.values.last)
+                const SizedBox(height: 8),
+            ],
+            if (kDebugMode) ...[
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: busy
+                    ? null
+                    : () async {
+                        final scheduled = await controller
+                            .scheduleDebugTakbeerTest();
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              scheduled
+                                  ? 'Takbeer notification scheduled in 10 seconds'
+                                  : 'Could not schedule the Takbeer notification',
+                            ),
+                          ),
+                        );
+                      },
+                icon: const Icon(Icons.bug_report_outlined),
+                label: const Text('Test Takbeer notification (10 seconds)'),
               ),
             ],
             if (issue != null) ...[
@@ -189,6 +204,86 @@ class PrayerReminderSettingsCard extends StatelessWidget {
       ),
     );
   });
+}
+
+class _AlarmSoundOption extends StatelessWidget {
+  const _AlarmSoundOption({
+    required this.sound,
+    required this.selected,
+    required this.enabled,
+    required this.previewing,
+    required this.onSelected,
+    required this.onPreview,
+  });
+
+  final PrayerAlarmSound sound;
+  final bool selected;
+  final bool enabled;
+  final bool previewing;
+  final VoidCallback onSelected;
+  final VoidCallback onPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final label = switch (sound) {
+      PrayerAlarmSound.systemDefault => 'alarm_sound_default'.tr,
+      PrayerAlarmSound.takbeer => 'alarm_sound_takbeer'.tr,
+      PrayerAlarmSound.silent => 'alarm_sound_silent'.tr,
+    };
+    final icon = switch (sound) {
+      PrayerAlarmSound.systemDefault => Icons.notifications_outlined,
+      PrayerAlarmSound.takbeer => Icons.volume_up_outlined,
+      PrayerAlarmSound.silent => Icons.notifications_off_outlined,
+    };
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: selected
+            ? colorScheme.primaryContainer.withValues(alpha: 0.58)
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: enabled ? onSelected : null,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 6, 8),
+            child: Row(
+              children: [
+                Icon(icon, size: 21, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (selected)
+                  Icon(Icons.check_circle_rounded, color: colorScheme.primary),
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'preview_alarm_sound'.trParams({'sound': label}),
+                  onPressed: enabled && !previewing ? onPreview : null,
+                  icon: previewing
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.play_arrow_rounded),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ReminderTimeSheet extends StatefulWidget {

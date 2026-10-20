@@ -7,6 +7,7 @@ import 'package:sakinah/core/storage/storage_keys.dart';
 import 'package:sakinah/core/storage/storage_service.dart';
 import 'package:sakinah/features/prayer_times/domain/entities/prayer_reminder_settings.dart';
 import 'package:sakinah/features/prayer_times/presentation/controllers/prayer_reminder_controller.dart';
+import 'package:sakinah/features/prayer_times/presentation/services/prayer_alarm_preview_player.dart';
 import 'package:sakinah/features/prayer_times/presentation/services/prayer_notification_scheduler.dart';
 import 'package:sakinah/features/prayer_times/presentation/widgets/prayer_reminder_settings_card.dart';
 
@@ -60,6 +61,58 @@ void main() {
     expect(controller.isEnabled, isTrue);
     expect(controller.minutesBefore, 30);
     expect(controller.reminderType, PrayerReminderType.takbeer);
+    expect(controller.alarmSound, PrayerAlarmSound.takbeer);
+  });
+
+  test('alarm sound selection is saved and restored', () async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final preview = _FakeAlarmPreviewPlayer();
+    final controller = PrayerReminderController(
+      storage,
+      PrayerNotificationScheduler(notifications, storage),
+      notifications,
+      preview,
+    )..onInit();
+
+    await controller.setAlarmSound(PrayerAlarmSound.silent);
+    await controller.previewAlarmSound(PrayerAlarmSound.systemDefault);
+    await controller.previewAlarmSound(PrayerAlarmSound.takbeer);
+    await controller.previewAlarmSound(PrayerAlarmSound.silent);
+    controller.onClose();
+
+    final restarted = PrayerReminderController(
+      storage,
+      PrayerNotificationScheduler(notifications, storage),
+      notifications,
+      _FakeAlarmPreviewPlayer(),
+    )..onInit();
+    addTearDown(restarted.onClose);
+
+    expect(restarted.alarmSound, PrayerAlarmSound.silent);
+    expect(preview.previews, PrayerAlarmSound.values);
+  });
+
+  test('legacy reminder types migrate to alarm sounds', () {
+    expect(
+      PrayerReminderSettings.fromJson(const <String, dynamic>{
+        'type': 'takbeer',
+      }).alarmSound,
+      PrayerAlarmSound.takbeer,
+    );
+    expect(
+      PrayerReminderSettings.fromJson(const <String, dynamic>{
+        'type': 'text',
+      }).alarmSound,
+      PrayerAlarmSound.systemDefault,
+    );
+    expect(
+      PrayerReminderSettings.fromJson(const <String, dynamic>{
+        'type': 'takbeer',
+        'alarmSound': 'silent',
+      }).alarmSound,
+      PrayerAlarmSound.silent,
+    );
   });
 
   test('custom minutes accept 1 to 120 and reject invalid values', () async {
@@ -69,6 +122,7 @@ void main() {
       storage,
       PrayerNotificationScheduler(notifications, storage),
       notifications,
+      _FakeAlarmPreviewPlayer(),
     )..onInit();
     addTearDown(controller.onClose);
 
@@ -91,11 +145,14 @@ void main() {
     final storage = _MemoryStorageService();
     final notifications = _FakeNotificationService()
       ..notificationsEnabled = false;
+    final preview = _FakeAlarmPreviewPlayer();
     final controller = PrayerReminderController(
       storage,
       PrayerNotificationScheduler(notifications, storage),
       notifications,
+      preview,
     )..onInit();
+    addTearDown(controller.onClose);
 
     await controller.setEnabled(true);
     await controller.setEnabled(true);
@@ -147,11 +204,14 @@ void main() {
 
     final storage = _MemoryStorageService();
     final notifications = _FakeNotificationService();
+    final preview = _FakeAlarmPreviewPlayer();
     final controller = PrayerReminderController(
       storage,
       PrayerNotificationScheduler(notifications, storage),
       notifications,
+      preview,
     )..onInit();
+    addTearDown(controller.onClose);
 
     await tester.pumpWidget(
       GetMaterialApp(
@@ -167,8 +227,13 @@ void main() {
     );
 
     expect(find.text('Prayer reminders'), findsOneWidget);
+    expect(find.text('Alarm Sound'), findsOneWidget);
+    expect(find.text('System default'), findsOneWidget);
     expect(find.text('Takbeer'), findsOneWidget);
-    expect(find.text('Text notification'), findsOneWidget);
+    expect(find.text('Silent'), findsOneWidget);
+    await tester.tap(find.byTooltip('Preview System default'));
+    await tester.pump();
+    expect(preview.previews, [PrayerAlarmSound.systemDefault]);
     expect(tester.takeException(), isNull);
   });
 
@@ -293,4 +358,17 @@ class _MemoryStorageService extends StorageService {
     _json[key] = value;
     return true;
   }
+}
+
+class _FakeAlarmPreviewPlayer implements PrayerAlarmPreviewPlayer {
+  final previews = <PrayerAlarmSound>[];
+
+  @override
+  Future<void> preview(PrayerAlarmSound sound) async => previews.add(sound);
+
+  @override
+  Future<void> stop() async {}
+
+  @override
+  Future<void> dispose() async {}
 }

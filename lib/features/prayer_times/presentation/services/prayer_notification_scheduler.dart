@@ -26,6 +26,7 @@ class PrayerReminderPlan {
     required this.channelName,
     required this.channelDescription,
     this.androidSoundResource,
+    this.playSound = true,
   });
 
   final int id;
@@ -37,6 +38,7 @@ class PrayerReminderPlan {
   final String channelName;
   final String channelDescription;
   final String? androidSoundResource;
+  final bool playSound;
 
   LocalNotificationRequest toRequest() => LocalNotificationRequest(
     id: id,
@@ -48,6 +50,7 @@ class PrayerReminderPlan {
     channelDescription: channelDescription,
     payload: 'prayer-reminder:${prayerName.name}',
     androidSoundResource: androidSoundResource,
+    playSound: playSound,
   );
 }
 
@@ -89,6 +92,40 @@ class PrayerNotificationScheduler {
 
   Future<void> cancelPrayerReminders() => _enqueue(_cancelStoredIds);
 
+  /// Schedules a real Takbeer notification through the production scheduling
+  /// service. The debug UI uses this to inspect Android's runtime behavior.
+  Future<void> scheduleDebugTakbeerTest() {
+    if (!kDebugMode) {
+      return Future<void>.error(
+        StateError('The Takbeer notification test is debug-only.'),
+      );
+    }
+
+    return _enqueue(() async {
+      await _notifications.initialize();
+      await _notifications.refreshLocalTimezone();
+      final scheduledDate = _now(tz.local).add(const Duration(seconds: 10));
+      await _notifications.schedule(
+        LocalNotificationRequest(
+          id: 900000001,
+          title: 'Sakinah notification test',
+          body: 'Debug Takbeer notification scheduled in 10 seconds',
+          scheduledDate: scheduledDate,
+          channelId: PrayerNotificationChannels.takbeerId,
+          channelName: PrayerNotificationChannels.takbeerName,
+          channelDescription: PrayerNotificationChannels.takbeerDescription,
+          payload: 'prayer-reminder:debug-takbeer-test',
+          androidSoundResource: PrayerNotificationChannels.takbeerSoundResource,
+        ),
+      );
+      debugPrint(
+        '[PrayerNotification] Scheduled debug Takbeer test '
+        'id=900000001 at=$scheduledDate '
+        'channel=${PrayerNotificationChannels.takbeerId}',
+      );
+    });
+  }
+
   List<PrayerReminderPlan> buildPlans(
     List<PrayerSchedule> schedules,
     PrayerReminderSettings settings, {
@@ -117,7 +154,7 @@ class PrayerNotificationScheduler {
         if (!reminderTime.isAfter(now)) continue;
 
         final isArabic = languageCode == 'ar';
-        final usesTakbeer = settings.type == PrayerReminderType.takbeer;
+        final sound = settings.alarmSound;
         final id = NotificationIds.prayerReminder(
           date: schedule.date,
           prayerSlot: slot,
@@ -132,18 +169,30 @@ class PrayerNotificationScheduler {
             isArabic: isArabic,
             minutes: settings.minutesBefore,
           ),
-          channelId: usesTakbeer
-              ? PrayerNotificationChannels.takbeerId
-              : PrayerNotificationChannels.defaultId,
-          channelName: usesTakbeer
-              ? PrayerNotificationChannels.takbeerName
-              : PrayerNotificationChannels.defaultName,
-          channelDescription: usesTakbeer
-              ? PrayerNotificationChannels.takbeerDescription
-              : PrayerNotificationChannels.defaultDescription,
-          androidSoundResource: usesTakbeer
+          channelId: switch (sound) {
+            PrayerAlarmSound.systemDefault =>
+              PrayerNotificationChannels.defaultId,
+            PrayerAlarmSound.takbeer => PrayerNotificationChannels.takbeerId,
+            PrayerAlarmSound.silent => PrayerNotificationChannels.silentId,
+          },
+          channelName: switch (sound) {
+            PrayerAlarmSound.systemDefault =>
+              PrayerNotificationChannels.defaultName,
+            PrayerAlarmSound.takbeer => PrayerNotificationChannels.takbeerName,
+            PrayerAlarmSound.silent => PrayerNotificationChannels.silentName,
+          },
+          channelDescription: switch (sound) {
+            PrayerAlarmSound.systemDefault =>
+              PrayerNotificationChannels.defaultDescription,
+            PrayerAlarmSound.takbeer =>
+              PrayerNotificationChannels.takbeerDescription,
+            PrayerAlarmSound.silent =>
+              PrayerNotificationChannels.silentDescription,
+          },
+          androidSoundResource: sound == PrayerAlarmSound.takbeer
               ? PrayerNotificationChannels.takbeerSoundResource
               : null,
+          playSound: sound != PrayerAlarmSound.silent,
         );
       }
     }
@@ -154,8 +203,16 @@ class PrayerNotificationScheduler {
   }
 
   Future<void> _reschedule(PrayerReminderSettings settings) async {
+    if (!settings.enabled) {
+      await _cancelStoredIds();
+      return;
+    }
+
+    // A settings interaction can happen while prayer times are still loading.
+    // Keep the OS-owned reminders until replacement schedules are available.
+    if (_schedules.isEmpty) return;
+
     await _cancelStoredIds();
-    if (!settings.enabled || _schedules.isEmpty) return;
 
     await _notifications.initialize();
     await _notifications.refreshLocalTimezone();

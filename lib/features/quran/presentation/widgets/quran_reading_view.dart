@@ -1,211 +1,408 @@
 import 'dart:async';
-import 'dart:math' as math;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../domain/entities/mushaf_page.dart';
 import '../../domain/entities/surah.dart';
+import '../../domain/repositories/mushaf_page_source.dart';
 import '../controllers/quran_audio_controller.dart';
 import '../controllers/quran_controller.dart';
-import '../controllers/quran_reader_controller.dart';
 
 class QuranReadingView extends StatefulWidget {
   const QuranReadingView({
     required this.surah,
+    required this.initialAyahNumber,
     required this.quranController,
     required this.audioController,
-    required this.readerController,
+    required this.pageSource,
     super.key,
   });
 
   final Surah surah;
+  final int initialAyahNumber;
   final QuranController quranController;
   final QuranAudioController audioController;
-  final QuranReaderController readerController;
+  final MushafPageSource pageSource;
 
   @override
   State<QuranReadingView> createState() => QuranReadingViewState();
 }
 
 class QuranReadingViewState extends State<QuranReadingView> {
-  final GlobalKey _textKey = GlobalKey();
-  final Map<int, TextRange> _ayahRanges = <int, TextRange>{};
-  late List<TapGestureRecognizer> _recognizers;
+  late Future<MushafMetadata> _metadataFuture;
+  final Map<int, Future<String>> _pageFutures = <int, Future<String>>{};
+  PageController? _pageController;
+  MushafMetadata? _metadata;
+  int? _currentPage;
+  int? _initialPage;
+  bool _hasHandledInitialPageCallback = false;
 
   @override
   void initState() {
     super.initState();
-    _createRecognizers();
+    _metadataFuture = widget.pageSource.loadMetadata();
   }
 
-  @override
-  void didUpdateWidget(QuranReadingView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.surah.number != widget.surah.number ||
-        oldWidget.surah.ayahs.length != widget.surah.ayahs.length) {
-      _disposeRecognizers();
-      _createRecognizers();
-    }
-  }
-
-  void _createRecognizers() {
-    _recognizers = widget.surah.ayahs
-        .map((ayah) {
-          return TapGestureRecognizer()
-            ..onTap = () {
-              unawaited(
-                widget.quranController.markReadingPosition(
-                  widget.surah.number,
-                  ayah.numberInSurah,
-                ),
-              );
-              unawaited(widget.audioController.playAyah(widget.surah, ayah));
-            };
-        })
-        .toList(growable: false);
-  }
-
-  Future<void> scrollAyahIntoView(
-    int ayahNumber,
-    ScrollController scrollController, {
-    bool animate = true,
-  }) async {
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted || !scrollController.hasClients) return;
-    final range = _ayahRanges[ayahNumber];
-    final renderObject = _textKey.currentContext?.findRenderObject();
-    if (range == null || renderObject is! RenderParagraph) return;
-
-    final boxes = renderObject.getBoxesForSelection(
-      TextSelection(
-        baseOffset: range.start,
-        extentOffset: math.min(range.start + 1, range.end),
-      ),
-    );
-    if (boxes.isEmpty) return;
-
-    final viewport = RenderAbstractViewport.of(renderObject);
-    final paragraphOffset = viewport.getOffsetToReveal(renderObject, 0).offset;
-    final target = (paragraphOffset + boxes.first.top - 96).clamp(
-      scrollController.position.minScrollExtent,
-      scrollController.position.maxScrollExtent,
-    );
+  Future<void> showAyah(int ayahNumber, {bool animate = true}) async {
+    final metadata = _metadata ?? await _metadataFuture;
+    if (!mounted) return;
+    final page = metadata
+        .referenceFor(widget.surah.number, ayahNumber)
+        .pageNumber;
+    final controller = _pageController;
+    if (controller == null) return;
     if (animate) {
-      await scrollController.animateTo(
-        target,
+      await controller.animateToPage(
+        page - 1,
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
       );
     } else {
-      scrollController.jumpTo(target);
+      controller.jumpToPage(page - 1);
     }
   }
 
   @override
-  Widget build(BuildContext context) => Obx(() {
-    final currentAyah = widget.audioController.currentAyah.value;
-    final fontSize = widget.readerController.fontSize.value;
-    final colorScheme = Theme.of(context).colorScheme;
-    final spans = <InlineSpan>[];
-    _ayahRanges.clear();
-    var characterOffset = 0;
-
-    for (var index = 0; index < widget.surah.ayahs.length; index++) {
-      final ayah = widget.surah.ayahs[index];
-      final value =
-          '${ayah.text}\u00A0﴿${_arabicIndic(ayah.numberInSurah)}﴾'
-          '${index == widget.surah.ayahs.length - 1 ? '' : '\u00A0'}';
-      final isCurrent =
-          currentAyah?.numberInSurah == ayah.numberInSurah &&
-          widget.audioController.isCurrent(
-            widget.surah.number,
-            ayah.numberInSurah,
-          );
-      _ayahRanges[ayah.numberInSurah] = TextRange(
-        start: characterOffset,
-        end: characterOffset + value.length,
+  Widget build(BuildContext context) => FutureBuilder<MushafMetadata>(
+    future: _metadataFuture,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return _MushafLoadError(onRetry: _reloadMetadata);
+      }
+      final metadata = snapshot.data;
+      if (metadata == null) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      _metadata = metadata;
+      final initialReference = metadata.referenceFor(
+        widget.surah.number,
+        widget.initialAyahNumber,
       );
-      characterOffset += value.length;
-
-      spans.add(
-        TextSpan(
-          text: value,
-          recognizer: _recognizers[index],
-          semanticsLabel:
-              '${ayah.text}، ${'quran_ayah_number'.trParams({'number': '${ayah.numberInSurah}'})}',
-          style: TextStyle(
-            color: isCurrent
-                ? colorScheme.primary
-                : Theme.of(context).brightness == Brightness.light
-                ? AppColors.ink
-                : colorScheme.onSurface,
-            backgroundColor: isCurrent
-                ? colorScheme.primaryContainer.withValues(alpha: 0.42)
-                : null,
-          ),
-        ),
+      _pageController ??= PageController(
+        initialPage: initialReference.pageNumber - 1,
       );
-    }
+      _initialPage ??= initialReference.pageNumber;
+      _currentPage ??= initialReference.pageNumber;
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: AppConstants.maxContentWidth,
-        ),
-        child: Container(
-          key: const Key('quran-continuous-text'),
-          margin: const EdgeInsets.fromLTRB(20, 0, 20, 36),
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 26),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+      return Column(
+        children: [
+          _MushafPageHeader(metadata: metadata.page(_currentPage!)),
+          Expanded(
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: PageView.builder(
+                key: const Key('mushaf-page-view'),
+                controller: _pageController,
+                itemCount: MushafMetadata.totalPages,
+                allowImplicitScrolling: true,
+                onPageChanged: (index) => _onPageChanged(index + 1),
+                itemBuilder: (context, index) {
+                  final pageNumber = index + 1;
+                  return _buildPage(metadata.page(pageNumber));
+                },
+              ),
             ),
           ),
-          child: RichText(
-            key: _textKey,
-            textDirection: TextDirection.rtl,
-            textAlign: TextAlign.justify,
-            softWrap: true,
-            textScaler: MediaQuery.textScalerOf(context),
-            text: TextSpan(
-              style: TextStyle(
-                fontFamily: Theme.of(context).textTheme.bodyLarge?.fontFamily,
-                fontSize: fontSize,
-                fontWeight: FontWeight.w500,
-                height: 2,
+        ],
+      );
+    },
+  );
+
+  Widget _buildPage(MushafPageMetadata page) => FutureBuilder<String>(
+    future: _pageFutures.putIfAbsent(
+      page.pageNumber,
+      () => widget.pageSource.loadPageSvg(page.pageNumber),
+    ),
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return _MushafLoadError(
+          pageNumber: page.pageNumber,
+          onRetry: () => _reloadPage(page.pageNumber),
+        );
+      }
+      final svg = snapshot.data;
+      if (svg == null) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      return _MushafPageCanvas(
+        page: page,
+        svg: svg,
+        audioController: widget.audioController,
+        onAyahTap: _playAyah,
+      );
+    },
+  );
+
+  void _onPageChanged(int pageNumber) {
+    setState(() => _currentPage = pageNumber);
+    if (!_hasHandledInitialPageCallback) {
+      _hasHandledInitialPageCallback = true;
+      if (pageNumber == _initialPage) return;
+    }
+    final firstAyah = _metadata!.page(pageNumber).firstAyah;
+    unawaited(
+      widget.quranController.markReadingPosition(
+        firstAyah.surahNumber,
+        firstAyah.ayahNumber,
+      ),
+    );
+    widget.pageSource.prefetchPage(pageNumber - 1);
+    widget.pageSource.prefetchPage(pageNumber + 1);
+  }
+
+  Future<void> _playAyah(MushafAyahReference reference) async {
+    await widget.quranController.markReadingPosition(
+      reference.surahNumber,
+      reference.ayahNumber,
+    );
+    final surah = await widget.quranController.getSurahForReader(
+      reference.surahNumber,
+    );
+    if (!mounted || reference.ayahNumber > surah.ayahs.length) return;
+    await widget.audioController.playAyah(
+      surah,
+      surah.ayahs[reference.ayahNumber - 1],
+    );
+  }
+
+  void _reloadPage(int pageNumber) {
+    setState(() {
+      _pageFutures[pageNumber] = widget.pageSource.loadPageSvg(pageNumber);
+    });
+  }
+
+  void _reloadMetadata() {
+    setState(() => _metadataFuture = widget.pageSource.loadMetadata());
+  }
+
+  @override
+  void dispose() {
+    _pageController?.dispose();
+    super.dispose();
+  }
+}
+
+class _MushafPageHeader extends StatelessWidget {
+  const _MushafPageHeader({required this.metadata});
+
+  final MushafPageMetadata metadata;
+
+  @override
+  Widget build(BuildContext context) {
+    final names = metadata.surahs.map((surah) => surah.arabicName).join(' • ');
+    return Semantics(
+      container: true,
+      label:
+          '$names, ${'quran_juz_number'.trParams({'number': '${metadata.juzNumber}'})}, '
+          '${'quran_page_number'.trParams({'number': '${metadata.pageNumber}'})}',
+      child: Container(
+        key: const Key('mushaf-page-header'),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          border: Border(
+            bottom: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                names,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textDirection: TextDirection.rtl,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontFamily: 'NotoNaskhArabic',
+                  color: AppColors.deepEmerald,
+                ),
               ),
-              children: spans,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              '${'quran_juz_short'.tr} ${metadata.juzNumber}',
+              key: const Key('mushaf-juz-number'),
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              '${metadata.pageNumber} / ${MushafMetadata.totalPages}',
+              key: const Key('mushaf-page-number'),
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MushafPageCanvas extends StatelessWidget {
+  const _MushafPageCanvas({
+    required this.page,
+    required this.svg,
+    required this.audioController,
+    required this.onAyahTap,
+  });
+
+  static const _pageAspectRatio = 345 / 550;
+
+  final MushafPageMetadata page;
+  final String svg;
+  final QuranAudioController audioController;
+  final ValueChanged<MushafAyahReference> onAyahTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+    child: Center(
+      child: AspectRatio(
+        aspectRatio: _pageAspectRatio,
+        child: RepaintBoundary(
+          key: Key('mushaf-page-${page.pageNumber}'),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFCF5),
+              border: Border.all(color: const Color(0xFFE2D8C3)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) => Stack(
+                fit: StackFit.expand,
+                children: [
+                  SvgPicture.string(
+                    svg,
+                    fit: BoxFit.contain,
+                    alignment: Alignment.center,
+                    semanticsLabel: 'quran_page_number'.trParams({
+                      'number': '${page.pageNumber}',
+                    }),
+                  ),
+                  ...page.ayahs.map(
+                    (ayah) => _AyahMarkerTarget(
+                      reference: ayah,
+                      canvasSize: constraints.biggest,
+                      audioController: audioController,
+                      onTap: () => onAyahTap(ayah),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    );
+    ),
+  );
+}
+
+class _AyahMarkerTarget extends StatelessWidget {
+  const _AyahMarkerTarget({
+    required this.reference,
+    required this.canvasSize,
+    required this.audioController,
+    required this.onTap,
   });
 
-  @override
-  void dispose() {
-    _disposeRecognizers();
-    super.dispose();
-  }
+  final MushafAyahReference reference;
+  final Size canvasSize;
+  final QuranAudioController audioController;
+  final VoidCallback onTap;
 
-  void _disposeRecognizers() {
-    for (final recognizer in _recognizers) {
-      recognizer.dispose();
+  @override
+  Widget build(BuildContext context) {
+    const targetSize = 30.0;
+    if (canvasSize.width < targetSize || canvasSize.height < targetSize) {
+      return const SizedBox.shrink();
     }
+    return Positioned(
+      left: (reference.markerX / 345 * canvasSize.width - targetSize / 2).clamp(
+        0,
+        canvasSize.width - targetSize,
+      ),
+      top: (reference.markerY / 550 * canvasSize.height - targetSize / 2).clamp(
+        0,
+        canvasSize.height - targetSize,
+      ),
+      child: Obx(() {
+        final selected = audioController.isCurrent(
+          reference.surahNumber,
+          reference.ayahNumber,
+        );
+        return Semantics(
+          button: true,
+          label: 'quran_play_ayah'.trParams({
+            'number': '${reference.ayahNumber}',
+          }),
+          child: GestureDetector(
+            key: Key(
+              'mushaf-ayah-${reference.surahNumber}-${reference.ayahNumber}',
+            ),
+            behavior: HitTestBehavior.translucent,
+            onTap: onTap,
+            child: Container(
+              width: targetSize,
+              height: targetSize,
+              decoration: selected
+                  ? BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      ),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer.withValues(alpha: 0.2),
+                    )
+                  : null,
+            ),
+          ),
+        );
+      }),
+    );
   }
 }
 
-String _arabicIndic(int value) {
-  const western = '0123456789';
-  const arabicIndic = '٠١٢٣٤٥٦٧٨٩';
-  return value.toString().split('').map((digit) {
-    final index = western.indexOf(digit);
-    return index < 0 ? digit : arabicIndic[index];
-  }).join();
+class _MushafLoadError extends StatelessWidget {
+  const _MushafLoadError({required this.onRetry, this.pageNumber});
+
+  final VoidCallback onRetry;
+  final int? pageNumber;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_off_rounded, size: 42),
+          const SizedBox(height: 12),
+          Text(
+            'quran_mushaf_page_error'.trParams({
+              'number': '${pageNumber ?? ''}',
+            }),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text('retry'.tr),
+          ),
+        ],
+      ),
+    ),
+  );
 }

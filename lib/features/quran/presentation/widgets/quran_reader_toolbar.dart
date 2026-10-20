@@ -51,44 +51,45 @@ class QuranReaderToolbar extends StatelessWidget {
                     readerController.setReadingMode(selection.first);
                   },
                 ),
-                Semantics(
-                  label: 'quran_font_size'.tr,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          tooltip: 'quran_font_decrease'.tr,
-                          onPressed: readerController.canDecreaseFont
-                              ? readerController.decreaseFontSize
-                              : null,
-                          icon: const Icon(Icons.text_decrease_rounded),
-                        ),
-                        SizedBox(
-                          width: 34,
-                          child: Text(
-                            '${fontSize.round()}',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.labelLarge,
+                if (mode == QuranReadingMode.memorization)
+                  Semantics(
+                    label: 'quran_font_size'.tr,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'quran_font_decrease'.tr,
+                            onPressed: readerController.canDecreaseFont
+                                ? readerController.decreaseFontSize
+                                : null,
+                            icon: const Icon(Icons.text_decrease_rounded),
                           ),
-                        ),
-                        IconButton(
-                          tooltip: 'quran_font_increase'.tr,
-                          onPressed: readerController.canIncreaseFont
-                              ? readerController.increaseFontSize
-                              : null,
-                          icon: const Icon(Icons.text_increase_rounded),
-                        ),
-                      ],
+                          SizedBox(
+                            width: 34,
+                            child: Text(
+                              '${fontSize.round()}',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'quran_font_increase'.tr,
+                            onPressed: readerController.canIncreaseFont
+                                ? readerController.increaseFontSize
+                                : null,
+                            icon: const Icon(Icons.text_increase_rounded),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 10),

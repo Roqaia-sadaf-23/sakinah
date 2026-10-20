@@ -53,6 +53,7 @@ void main() {
       storage,
     );
     final cached = await offlineRepository.getSurah(1);
+    expect(cached.ayahs.first.text, surah.ayahs.first.text);
     expect(cached.ayahs.map((ayah) => ayah.numberInSurah), [
       1,
       2,

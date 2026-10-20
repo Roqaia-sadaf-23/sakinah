@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
@@ -7,25 +8,34 @@ import '../../../../core/notifications/notification_service.dart';
 import '../../../../core/storage/storage_keys.dart';
 import '../../../../core/storage/storage_service.dart';
 import '../../domain/entities/prayer_reminder_settings.dart';
+import '../services/prayer_alarm_preview_player.dart';
 import '../services/prayer_notification_scheduler.dart';
 
 enum PrayerReminderPermissionIssue { notifications, exactAlarm, scheduling }
 
 class PrayerReminderController extends GetxController
     with WidgetsBindingObserver {
-  PrayerReminderController(this._storage, this._scheduler, this._notifications);
+  PrayerReminderController(
+    this._storage,
+    this._scheduler,
+    this._notifications, [
+    PrayerAlarmPreviewPlayer? previewPlayer,
+  ]) : _previewPlayer = previewPlayer;
 
   final StorageService _storage;
   final PrayerNotificationScheduler _scheduler;
   final NotificationService _notifications;
+  PrayerAlarmPreviewPlayer? _previewPlayer;
 
   final settings = PrayerReminderSettings.defaults.obs;
   final isBusy = false.obs;
   final permissionIssue = Rxn<PrayerReminderPermissionIssue>();
+  final previewingSound = Rxn<PrayerAlarmSound>();
 
   bool get isEnabled => settings.value.enabled;
   int get minutesBefore => settings.value.minutesBefore;
   PrayerReminderType get reminderType => settings.value.type;
+  PrayerAlarmSound get alarmSound => settings.value.alarmSound;
 
   @override
   void onInit() {
@@ -93,11 +103,19 @@ class PrayerReminderController extends GetxController
   }
 
   Future<void> setReminderType(PrayerReminderType type) async {
-    if (isBusy.value || settings.value.type == type) return;
+    await setAlarmSound(
+      type == PrayerReminderType.takbeer
+          ? PrayerAlarmSound.takbeer
+          : PrayerAlarmSound.systemDefault,
+    );
+  }
+
+  Future<void> setAlarmSound(PrayerAlarmSound sound) async {
+    if (isBusy.value || settings.value.alarmSound == sound) return;
     isBusy.value = true;
     permissionIssue.value = null;
     try {
-      final updated = settings.value.copyWith(type: type);
+      final updated = settings.value.copyWith(alarmSound: sound);
       await _save(updated);
       if (updated.enabled) {
         await _scheduler.settingsChanged(
@@ -109,6 +127,22 @@ class PrayerReminderController extends GetxController
       permissionIssue.value = PrayerReminderPermissionIssue.scheduling;
     } finally {
       isBusy.value = false;
+    }
+  }
+
+  Future<bool> previewAlarmSound(PrayerAlarmSound sound) async {
+    if (previewingSound.value != null) return false;
+    previewingSound.value = sound;
+    try {
+      final player = _previewPlayer ??= JustAudioPrayerAlarmPreviewPlayer();
+      await player.preview(sound);
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint('[PrayerNotification] Sound preview failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return false;
+    } finally {
+      previewingSound.value = null;
     }
   }
 
@@ -191,6 +225,34 @@ class PrayerReminderController extends GetxController
     }
   }
 
+  Future<bool> scheduleDebugTakbeerTest() async {
+    if (!kDebugMode || isBusy.value) return false;
+    isBusy.value = true;
+    permissionIssue.value = null;
+    try {
+      var notificationsAllowed = await _notifications.areNotificationsEnabled();
+      if (!notificationsAllowed) {
+        final result = await _notifications.requestNotificationPermission();
+        notificationsAllowed = result == NotificationPermissionState.granted;
+      }
+      if (!notificationsAllowed) {
+        permissionIssue.value = PrayerReminderPermissionIssue.notifications;
+        return false;
+      }
+
+      await _scheduler.scheduleDebugTakbeerTest();
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[PrayerNotification] Debug Takbeer test failed: $error\n$stackTrace',
+      );
+      permissionIssue.value = PrayerReminderPermissionIssue.scheduling;
+      return false;
+    } finally {
+      isBusy.value = false;
+    }
+  }
+
   Future<void> _save(PrayerReminderSettings value) async {
     settings.value = value;
     await _storage.writeJson(
@@ -202,6 +264,8 @@ class PrayerReminderController extends GetxController
   @override
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);
+    final previewPlayer = _previewPlayer;
+    if (previewPlayer != null) unawaited(previewPlayer.dispose());
     super.onClose();
   }
 }

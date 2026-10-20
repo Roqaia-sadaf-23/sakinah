@@ -28,6 +28,7 @@ class QuranController extends GetxController {
   final errorKey = 'quran_data_error'.obs;
   final surahErrorKey = 'quran_data_error'.obs;
   final searchQuery = ''.obs;
+  final Map<int, Future<Surah>> _readerSurahRequests = <int, Future<Surah>>{};
 
   @override
   void onInit() {
@@ -101,6 +102,16 @@ class QuranController extends GetxController {
     } catch (_) {
       // Reading must remain available even if preferences cannot be persisted.
     }
+  }
+
+  /// Loads an adjacent-page Surah for Mushaf audio without replacing the
+  /// route's [currentSurah] or putting the whole reader back into loading.
+  Future<Surah> getSurahForReader(int surahNumber) {
+    final current = currentSurah.value;
+    if (current?.number == surahNumber) return Future<Surah>.value(current);
+    return _readerSurahRequests[surahNumber] ??= _getSurah(
+      surahNumber,
+    ).whenComplete(() => _readerSurahRequests.remove(surahNumber));
   }
 
   void _applySearch(String query) {

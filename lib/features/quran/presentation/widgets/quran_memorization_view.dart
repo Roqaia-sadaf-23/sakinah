@@ -25,7 +25,12 @@ class QuranMemorizationView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SliverPadding(
-    padding: const EdgeInsets.fromLTRB(20, 0, 20, 36),
+    padding: EdgeInsets.fromLTRB(
+      MediaQuery.sizeOf(context).width < 360 ? 12 : 20,
+      0,
+      MediaQuery.sizeOf(context).width < 360 ? 12 : 20,
+      36,
+    ),
     sliver: SliverList.builder(
       itemCount: surah.ayahs.length * 2 - 1,
       itemBuilder: (context, index) {

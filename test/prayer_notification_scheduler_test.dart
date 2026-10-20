@@ -104,6 +104,30 @@ void main() {
 
       expect(plan.channelId, 'prayer_reminders_default_v2');
       expect(plan.androidSoundResource, isNull);
+      expect(plan.playSound, isTrue);
+    });
+
+    test('silent plans use a channel with sound disabled', () {
+      final scheduler = _scheduler(
+        now: (location) => tz.TZDateTime(location, 2026, 8, 30, 18),
+      );
+      final plan = scheduler
+          .buildPlans(
+            [
+              _schedule(prayers: [_prayer(PrayerName.maghrib, 18, 36)]),
+            ],
+            const PrayerReminderSettings(
+              enabled: true,
+              alarmSound: PrayerAlarmSound.silent,
+            ),
+            languageCode: 'en',
+          )
+          .single;
+
+      expect(plan.channelId, PrayerNotificationChannels.silentId);
+      expect(plan.androidSoundResource, isNull);
+      expect(plan.playSound, isFalse);
+      expect(plan.toRequest().playSound, isFalse);
     });
 
     test('supports only the five obligatory prayers with stable IDs', () {
@@ -151,14 +175,24 @@ void main() {
   });
 
   group('Android prayer notification channels', () {
-    test('both channels are configured to play sound', () {
+    test('sound channels play and the silent channel does not', () {
       expect(PrayerNotificationChannels.defaultChannel.playSound, isTrue);
       expect(PrayerNotificationChannels.takbeerChannel.playSound, isTrue);
+      expect(PrayerNotificationChannels.silentChannel.playSound, isFalse);
+      expect(
+        PrayerNotificationChannels.defaultChannel.audioAttributesUsage,
+        AudioAttributesUsage.notification,
+      );
+      expect(
+        PrayerNotificationChannels.takbeerChannel.audioAttributesUsage,
+        AudioAttributesUsage.notification,
+      );
       expect(
         PrayerNotificationChannels.all.map((channel) => channel.id),
         containsAll(<String>[
           'prayer_reminders_default_v2',
           'prayer_reminders_takbeer_v2',
+          'prayer_reminders_silent_v1',
         ]),
       );
     });
@@ -183,6 +217,7 @@ void main() {
       expect(details.channelId, 'prayer_reminders_takbeer_v2');
       expect(details.playSound, isTrue);
       expect(details.sound, isA<RawResourceAndroidNotificationSound>());
+      expect(details.audioAttributesUsage, AudioAttributesUsage.notification);
     });
 
     test('normal notification details use the default-sound channel', () {
@@ -198,6 +233,20 @@ void main() {
 
       expect(details.channelId, 'prayer_reminders_default_v2');
       expect(details.playSound, isTrue);
+      expect(details.sound, isNull);
+      expect(details.audioAttributesUsage, AudioAttributesUsage.notification);
+    });
+
+    test('silent notification details explicitly disable sound', () {
+      final details = PrayerNotificationChannels.detailsFor(
+        PrayerNotificationChannels.silentId,
+        channelName: PrayerNotificationChannels.silentName,
+        channelDescription: PrayerNotificationChannels.silentDescription,
+        playSound: false,
+      );
+
+      expect(details.channelId, PrayerNotificationChannels.silentId);
+      expect(details.playSound, isFalse);
       expect(details.sound, isNull);
     });
   });
@@ -311,6 +360,34 @@ void main() {
     expect(notifications.pending[202608301]!.scheduledDate.minute, 55);
   });
 
+  test(
+    'sound changes preserve existing reminders until schedules load',
+    () async {
+      final storage = _MemoryStorageService();
+      final notifications = _FakeNotificationService();
+      final existing = _unrelatedRequest(id: 202608301);
+      notifications.pending[existing.id] = existing;
+      await storage.writeJson(StorageKeys.prayerReminderScheduledIds, {
+        'ids': <int>[existing.id],
+      });
+      final scheduler = PrayerNotificationScheduler(notifications, storage);
+
+      await scheduler.settingsChanged(
+        const PrayerReminderSettings(
+          enabled: true,
+          alarmSound: PrayerAlarmSound.silent,
+        ),
+        languageCode: 'en',
+      );
+
+      expect(notifications.pending, contains(existing.id));
+      expect(notifications.cancelled, isEmpty);
+      expect(storage.readJson(StorageKeys.prayerReminderScheduledIds)?['ids'], [
+        existing.id,
+      ]);
+    },
+  );
+
   test('changing minutes replaces the existing prayer reminders', () async {
     final storage = _MemoryStorageService();
     final notifications = _FakeNotificationService();
@@ -389,6 +466,89 @@ void main() {
               'takbeer_notification',
             ),
       ),
+    );
+  });
+
+  test(
+    'changing sounds repeatedly keeps stable IDs without duplicates',
+    () async {
+      final storage = _MemoryStorageService();
+      final notifications = _FakeNotificationService();
+      final scheduler = PrayerNotificationScheduler(
+        notifications,
+        storage,
+        now: (location) => tz.TZDateTime(location, 2026, 8, 30),
+      );
+      await storage.writeJson(
+        StorageKeys.prayerReminderSettings,
+        const PrayerReminderSettings(enabled: true).toJson(),
+      );
+      await scheduler.updateSchedules(
+        today: _schedule(prayers: [_prayer(PrayerName.fajr, 5, 10)]),
+        tomorrow: _schedule(
+          date: DateTime(2026, 8, 31),
+          prayers: [_prayer(PrayerName.fajr, 5, 11)],
+        ),
+        languageCode: 'en',
+      );
+
+      await scheduler.settingsChanged(
+        const PrayerReminderSettings(
+          enabled: true,
+          alarmSound: PrayerAlarmSound.takbeer,
+        ),
+        languageCode: 'en',
+      );
+      await scheduler.settingsChanged(
+        const PrayerReminderSettings(
+          enabled: true,
+          alarmSound: PrayerAlarmSound.silent,
+        ),
+        languageCode: 'en',
+      );
+
+      expect(notifications.pending.keys, {202608301, 202608311});
+      expect(
+        notifications.pending.values,
+        everyElement(
+          isA<LocalNotificationRequest>()
+              .having(
+                (request) => request.channelId,
+                'channelId',
+                PrayerNotificationChannels.silentId,
+              )
+              .having((request) => request.playSound, 'playSound', isFalse),
+        ),
+      );
+      expect(
+        notifications.cancelled.where((id) => id == 202608301),
+        hasLength(2),
+      );
+      expect(
+        notifications.cancelled.where((id) => id == 202608311),
+        hasLength(2),
+      );
+    },
+  );
+
+  test('debug Takbeer test uses the real Takbeer scheduling request', () async {
+    final notifications = _FakeNotificationService();
+    final now = tz.TZDateTime(tz.UTC, 2026, 10, 16, 12);
+    final scheduler = PrayerNotificationScheduler(
+      notifications,
+      _MemoryStorageService(),
+      now: (_) => now,
+    );
+
+    await scheduler.scheduleDebugTakbeerTest();
+
+    final request = notifications.pending[900000001];
+    expect(request, isNotNull);
+    expect(request!.scheduledDate, now.add(const Duration(seconds: 10)));
+    expect(request.channelId, PrayerNotificationChannels.takbeerId);
+    expect(
+      request.androidSoundResource,
+      PrayerNotificationChannels.takbeerSoundResource,
     );
   });
 

@@ -5,6 +5,8 @@ import '../../data/datasources/quran_audio_remote_data_source.dart';
 import '../../data/datasources/quran_remote_data_source.dart';
 import '../../data/repositories/quran_repository_impl.dart';
 import '../../data/services/just_audio_quran_player.dart';
+import '../../data/services/asset_mushaf_page_source.dart';
+import '../../domain/repositories/mushaf_page_source.dart';
 import '../../domain/repositories/quran_repository.dart';
 import '../../domain/services/quran_audio_player.dart';
 import '../../domain/usecases/get_quran_surahs.dart';
@@ -41,6 +43,9 @@ class QuranBinding extends Bindings {
     }
     if (!Get.isRegistered<QuranAudioPlayer>()) {
       Get.lazyPut<QuranAudioPlayer>(JustAudioQuranPlayer.new);
+    }
+    if (!Get.isRegistered<MushafPageSource>()) {
+      Get.lazyPut<MushafPageSource>(AssetMushafPageSource.new);
     }
     if (!Get.isRegistered<QuranController>()) {
       Get.lazyPut(

@@ -12,12 +12,17 @@ abstract final class PrayerNotificationChannels {
   static const takbeerDescription = 'Prayer reminders using Takbeer sound';
   static const takbeerSoundResource = 'takbeer_notification';
 
+  static const silentId = 'prayer_reminders_silent_v1';
+  static const silentName = 'Prayer Reminders - Silent';
+  static const silentDescription = 'Silent prayer reminder notifications';
+
   static const defaultChannel = AndroidNotificationChannel(
     defaultId,
     defaultName,
     description: defaultDescription,
     importance: Importance.high,
     playSound: true,
+    audioAttributesUsage: AudioAttributesUsage.notification,
   );
 
   static const takbeerChannel = AndroidNotificationChannel(
@@ -27,11 +32,21 @@ abstract final class PrayerNotificationChannels {
     importance: Importance.high,
     playSound: true,
     sound: RawResourceAndroidNotificationSound(takbeerSoundResource),
+    audioAttributesUsage: AudioAttributesUsage.notification,
+  );
+
+  static const silentChannel = AndroidNotificationChannel(
+    silentId,
+    silentName,
+    description: silentDescription,
+    importance: Importance.high,
+    playSound: false,
   );
 
   static const all = <AndroidNotificationChannel>[
     defaultChannel,
     takbeerChannel,
+    silentChannel,
   ];
 
   static AndroidNotificationDetails detailsFor(
@@ -39,7 +54,20 @@ abstract final class PrayerNotificationChannels {
     required String channelName,
     required String channelDescription,
     String? androidSoundResource,
+    bool playSound = true,
   }) {
+    if (channelId == silentId) {
+      return const AndroidNotificationDetails(
+        silentId,
+        silentName,
+        channelDescription: silentDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        category: AndroidNotificationCategory.reminder,
+        playSound: false,
+      );
+    }
+
     if (channelId == takbeerId) {
       return const AndroidNotificationDetails(
         takbeerId,
@@ -50,6 +78,7 @@ abstract final class PrayerNotificationChannels {
         category: AndroidNotificationCategory.reminder,
         playSound: true,
         sound: RawResourceAndroidNotificationSound(takbeerSoundResource),
+        audioAttributesUsage: AudioAttributesUsage.notification,
       );
     }
 
@@ -62,6 +91,7 @@ abstract final class PrayerNotificationChannels {
         priority: Priority.high,
         category: AndroidNotificationCategory.reminder,
         playSound: true,
+        audioAttributesUsage: AudioAttributesUsage.notification,
       );
     }
 
@@ -72,10 +102,11 @@ abstract final class PrayerNotificationChannels {
       importance: Importance.high,
       priority: Priority.high,
       category: AndroidNotificationCategory.reminder,
-      playSound: true,
+      playSound: playSound,
       sound: androidSoundResource == null
           ? null
           : RawResourceAndroidNotificationSound(androidSoundResource),
+      audioAttributesUsage: AudioAttributesUsage.notification,
     );
   }
 }

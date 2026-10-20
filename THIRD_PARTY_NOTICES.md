@@ -1,5 +1,47 @@
 # Third-party notices
 
+## Madinah Mushaf page artwork and metadata
+
+The Quran reading view displays the 604-page Hafs/KFQC SVG edition published
+by the `quran-ws/quran-svg` project. All 604 canonical page SVGs and the
+bundled `surah.json` and `markers.json` metadata files are copied verbatim
+from upstream commit `9fc0c87aebd7e528ceb90706707d6e5e9d2d698b`:
+<https://github.com/quran-ws/quran-svg/tree/9fc0c87aebd7e528ceb90706707d6e5e9d2d698b/mushafs/hafs/kfqc>
+
+The SVGs are bundled at `assets/quran/mushaf/hafs_kfqc/pages/`; no network
+request is required to open any Mushaf page. Per-page SHA-256 values are
+recorded in `assets/data/quran/mushaf_hafs_kfqc_pages.sha256`.
+
+Bundled metadata SHA-256 values:
+
+- `mushaf_hafs_kfqc_markers.json`:
+  `7444562F81A9844463B4178A6E014972834FC2DF9C3A9A8E5C45CB1776AB93C8`
+- `mushaf_hafs_kfqc_surahs.json`:
+  `B939433E9AD3EBD93925F1A7721CE572570E353A8B7A3685FBA9E1A4C2345F63`
+
+The page artwork is derived from the King Fahd Glorious Qur'an Printing
+Complex (KFQC) digital Madinah Mushaf. KFQC's published usage terms permit
+free use in digital publishing, media, websites, software, and similar
+intermediaries. The upstream notice, including the separate restriction on
+commercial physical printing in or import into Saudi Arabia, is available at:
+<https://github.com/quran-ws/quran-svg/blob/9fc0c87aebd7e528ceb90706707d6e5e9d2d698b/NOTICE.md>
+
+At that pinned revision, the `quran-ws` metadata and ayah hit-layer are
+dedicated to the public domain under CC0 1.0. This notice is retained for
+provenance and correction tracking. Sakinah does not alter or reconstruct the
+page artwork.
+
+## flutter_svg
+
+`flutter_svg` is distributed under the MIT License. It is used to render the
+unmodified SVG page artwork with aspect-preserving scaling.
+
+## Noto Naskh Arabic font
+
+`assets/fonts/NotoNaskhArabic-Variable.ttf` is distributed by the Noto
+Project under the SIL Open Font License 1.1. The complete license is included
+at `assets/fonts/OFL-NotoNaskhArabic.txt`.
+
 ## Takbeer notification sound
 
 `android/app/src/main/res/raw/takbeer_notification.mp3` is an MP3 transcode of

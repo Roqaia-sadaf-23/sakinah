@@ -9,6 +9,8 @@ import '../../domain/entities/surah.dart';
 import '../controllers/quran_audio_controller.dart';
 import '../controllers/quran_controller.dart';
 import '../controllers/quran_reader_controller.dart';
+import 'quran_text_style.dart';
+import 'quran_verse_marker.dart';
 
 class AyahCard extends StatelessWidget {
   const AyahCard({
@@ -98,11 +100,13 @@ class AyahCard extends StatelessWidget {
                   textDirection: TextDirection.rtl,
                   child: Text(
                     ayah.text,
-                    textAlign: TextAlign.right,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    textAlign: TextAlign.start,
+                    locale: const Locale('ar'),
+                    softWrap: true,
+                    strutStyle: QuranTextStyle.strut(fontSize),
+                    textHeightBehavior: QuranTextStyle.textHeightBehavior,
+                    style: QuranTextStyle.of(
                       fontSize: fontSize,
-                      fontWeight: FontWeight.w500,
-                      height: 2,
                       color: Theme.of(context).brightness == Brightness.light
                           ? AppColors.ink
                           : colorScheme.onSurface,
@@ -133,9 +137,11 @@ class _AyahMarker extends StatelessWidget {
       shape: BoxShape.circle,
     ),
     child: Text(
-      '$number',
+      QuranVerseMarker.arabicIndic(number),
+      textDirection: TextDirection.rtl,
       style: Theme.of(context).textTheme.labelLarge?.copyWith(
         color: Theme.of(context).colorScheme.onSecondaryContainer,
+        fontWeight: FontWeight.w800,
       ),
     ),
   );

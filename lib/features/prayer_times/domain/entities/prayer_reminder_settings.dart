@@ -1,13 +1,20 @@
 enum PrayerReminderType { takbeer, text }
 
+enum PrayerAlarmSound { systemDefault, takbeer, silent }
+
 class PrayerReminderSettings {
   const PrayerReminderSettings({
     this.enabled = false,
     this.minutesBefore = 5,
-    this.type = PrayerReminderType.text,
+    PrayerAlarmSound? alarmSound,
+    PrayerReminderType type = PrayerReminderType.text,
     this.notificationPermissionRequested = false,
     this.exactAlarmPermissionRequested = false,
-  });
+  }) : alarmSound =
+           alarmSound ??
+           (type == PrayerReminderType.takbeer
+               ? PrayerAlarmSound.takbeer
+               : PrayerAlarmSound.systemDefault);
 
   static const defaults = PrayerReminderSettings();
   static const minMinutesBefore = 1;
@@ -16,9 +23,14 @@ class PrayerReminderSettings {
 
   final bool enabled;
   final int minutesBefore;
-  final PrayerReminderType type;
+  final PrayerAlarmSound alarmSound;
   final bool notificationPermissionRequested;
   final bool exactAlarmPermissionRequested;
+
+  /// Kept for stored-setting and API compatibility with older app versions.
+  PrayerReminderType get type => alarmSound == PrayerAlarmSound.takbeer
+      ? PrayerReminderType.takbeer
+      : PrayerReminderType.text;
 
   static bool isValidMinutes(int minutes) =>
       minutes >= minMinutesBefore && minutes <= maxMinutesBefore;
@@ -26,13 +38,20 @@ class PrayerReminderSettings {
   PrayerReminderSettings copyWith({
     bool? enabled,
     int? minutesBefore,
+    PrayerAlarmSound? alarmSound,
     PrayerReminderType? type,
     bool? notificationPermissionRequested,
     bool? exactAlarmPermissionRequested,
   }) => PrayerReminderSettings(
     enabled: enabled ?? this.enabled,
     minutesBefore: minutesBefore ?? this.minutesBefore,
-    type: type ?? this.type,
+    alarmSound:
+        alarmSound ??
+        (type == null
+            ? this.alarmSound
+            : type == PrayerReminderType.takbeer
+            ? PrayerAlarmSound.takbeer
+            : PrayerAlarmSound.systemDefault),
     notificationPermissionRequested:
         notificationPermissionRequested ?? this.notificationPermissionRequested,
     exactAlarmPermissionRequested:
@@ -43,12 +62,19 @@ class PrayerReminderSettings {
     if (json == null) return defaults;
     final storedMinutes = json['minutesBefore'];
     final minutes = storedMinutes is num ? storedMinutes.toInt() : 5;
+    final migratedSound = switch (json['alarmSound']) {
+      'systemDefault' => PrayerAlarmSound.systemDefault,
+      'takbeer' => PrayerAlarmSound.takbeer,
+      'silent' => PrayerAlarmSound.silent,
+      _ =>
+        json['type'] == PrayerReminderType.takbeer.name
+            ? PrayerAlarmSound.takbeer
+            : PrayerAlarmSound.systemDefault,
+    };
     return PrayerReminderSettings(
       enabled: json['enabled'] == true,
       minutesBefore: isValidMinutes(minutes) ? minutes : 5,
-      type: json['type'] == PrayerReminderType.takbeer.name
-          ? PrayerReminderType.takbeer
-          : PrayerReminderType.text,
+      alarmSound: migratedSound,
       notificationPermissionRequested:
           json['notificationPermissionRequested'] == true,
       exactAlarmPermissionRequested:
@@ -59,6 +85,8 @@ class PrayerReminderSettings {
   Map<String, dynamic> toJson() => {
     'enabled': enabled,
     'minutesBefore': minutesBefore,
+    'alarmSound': alarmSound.name,
+    // Continue writing the legacy field so a downgraded build still works.
     'type': type.name,
     'notificationPermissionRequested': notificationPermissionRequested,
     'exactAlarmPermissionRequested': exactAlarmPermissionRequested,
