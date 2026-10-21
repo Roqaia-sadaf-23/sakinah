@@ -137,7 +137,12 @@ class QuranReadingViewState extends State<QuranReadingView> {
   );
 
   void _onPageChanged(int pageNumber) {
-    setState(() => _currentPage = pageNumber);
+    setState(() {
+      _currentPage = pageNumber;
+      _pageFutures.removeWhere(
+        (cachedPage, _) => (cachedPage - pageNumber).abs() > 2,
+      );
+    });
     if (!_hasHandledInitialPageCallback) {
       _hasHandledInitialPageCallback = true;
       if (pageNumber == _initialPage) return;

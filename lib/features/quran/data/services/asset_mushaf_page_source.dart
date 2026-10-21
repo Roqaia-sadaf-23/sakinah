@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/entities/mushaf_page.dart';
@@ -11,7 +13,7 @@ class AssetMushafPageSource implements MushafPageSource {
     : _assetBundle = assetBundle ?? rootBundle;
 
   static const sourceCommit = '9fc0c87aebd7e528ceb90706707d6e5e9d2d698b';
-  static const pageAssetPrefix = 'assets/quran/mushaf/hafs_kfqc/pages';
+  static const pageAssetPrefix = 'assets/quran/mushaf/hafs_kfqc/pages_bz2';
   static const _surahAsset = 'assets/data/quran/mushaf_hafs_kfqc_surahs.json';
   static const _markerAsset = 'assets/data/quran/mushaf_hafs_kfqc_markers.json';
 
@@ -23,7 +25,7 @@ class AssetMushafPageSource implements MushafPageSource {
   static String assetPathForPage(int pageNumber) {
     _validatePageNumber(pageNumber);
     final fileName = pageNumber.toString().padLeft(3, '0');
-    return '$pageAssetPrefix/$fileName.svg';
+    return '$pageAssetPrefix/$fileName.svg.bz2';
   }
 
   @override
@@ -51,7 +53,16 @@ class AssetMushafPageSource implements MushafPageSource {
 
   Future<String> _loadBundledPage(int pageNumber) async {
     try {
-      final svg = await _assetBundle.loadString(assetPathForPage(pageNumber));
+      final compressed = await _assetBundle.load(assetPathForPage(pageNumber));
+      final bytes = compressed.buffer.asUint8List(
+        compressed.offsetInBytes,
+        compressed.lengthInBytes,
+      );
+      final svg = await compute(
+        _decodeMushafPage,
+        bytes,
+        debugLabel: 'Decode Mushaf page $pageNumber',
+      );
       if (!svg.contains('<svg') ||
           !svg.contains('viewBox=') ||
           !svg.contains('ayahPolygon')) {
@@ -136,4 +147,9 @@ class AssetMushafPageSource implements MushafPageSource {
       );
     }
   }
+}
+
+String _decodeMushafPage(Uint8List compressed) {
+  final original = BZip2Decoder().decodeBytes(compressed, verify: true);
+  return utf8.decode(original);
 }

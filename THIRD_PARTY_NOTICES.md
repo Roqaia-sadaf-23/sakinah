@@ -8,9 +8,11 @@ bundled `surah.json` and `markers.json` metadata files are copied verbatim
 from upstream commit `9fc0c87aebd7e528ceb90706707d6e5e9d2d698b`:
 <https://github.com/quran-ws/quran-svg/tree/9fc0c87aebd7e528ceb90706707d6e5e9d2d698b/mushafs/hafs/kfqc>
 
-The SVGs are bundled at `assets/quran/mushaf/hafs_kfqc/pages/`; no network
-request is required to open any Mushaf page. Per-page SHA-256 values are
-recorded in `assets/data/quran/mushaf_hafs_kfqc_pages.sha256`.
+Each SVG is stored as a losslessly compressed BZip2 asset under
+`assets/quran/mushaf/hafs_kfqc/pages_bz2/`; no network request is required to
+open any Mushaf page. Decompression restores the exact pinned SVG bytes before
+rendering. Per-page SHA-256 values for those restored originals are recorded
+in `assets/data/quran/mushaf_hafs_kfqc_pages.sha256`.
 
 Bundled metadata SHA-256 values:
 
@@ -35,6 +37,11 @@ page artwork.
 
 `flutter_svg` is distributed under the MIT License. It is used to render the
 unmodified SVG page artwork with aspect-preserving scaling.
+
+## archive
+
+`archive` is distributed under the BSD 3-Clause License. It is used only to
+losslessly decompress the bundled Mushaf pages before rendering.
 
 ## Noto Naskh Arabic font
 

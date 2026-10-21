@@ -32,12 +32,10 @@ void main() {
       ) {
         final fileName = '${pageNumber.toString().padLeft(3, '0')}.svg';
         final assetPath = AssetMushafPageSource.assetPathForPage(pageNumber);
-        final data = await rootBundle.load(assetPath);
-        final bytes = data.buffer.asUint8List(
-          data.offsetInBytes,
-          data.lengthInBytes,
-        );
-        final pageSvg = utf8.decode(bytes);
+        final compressed = await rootBundle.load(assetPath);
+        expect(compressed.lengthInBytes, greaterThan(0));
+        final pageSvg = await source.loadPageSvg(pageNumber);
+        final bytes = utf8.encode(pageSvg);
 
         expect(
           sha256.convert(bytes).toString(),
@@ -73,7 +71,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
       }
     },
-    timeout: const Timeout(Duration(minutes: 15)),
+    timeout: const Timeout(Duration(minutes: 30)),
   );
 }
 
