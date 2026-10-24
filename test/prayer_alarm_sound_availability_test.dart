@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -14,49 +13,57 @@ void main() {
   setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.android);
   tearDown(() => debugDefaultTargetPlatformOverride = null);
 
-  test('debug exposes technically verified sounds without changing license', () async {
-    final bundle = _bundle();
-    final availability = BundledPrayerAlarmSoundAvailability(
-      bundle: bundle,
-      allowTechnicallyVerifiedDebugSounds: true,
-    );
+  test(
+    'debug exposes technically verified sounds without changing license',
+    () async {
+      final bundle = _bundle();
+      final availability = BundledPrayerAlarmSoundAvailability(
+        bundle: bundle,
+        allowTechnicallyVerifiedDebugSounds: true,
+      );
 
-    expect(
-      await availability.availableSounds(),
-      containsAll(PrayerAlarmSound.values),
-    );
-  });
+      expect(
+        await availability.availableSounds(),
+        containsAll(PrayerAlarmSound.values),
+      );
+    },
+  );
 
-  test('release keeps sounds unavailable while redistribution is unverified', () async {
-    final bundle = _bundle();
-    final availability = BundledPrayerAlarmSoundAvailability(
-      bundle: bundle,
-      allowTechnicallyVerifiedDebugSounds: false,
-    );
+  test(
+    'release keeps sounds unavailable while redistribution is unverified',
+    () async {
+      final bundle = _bundle();
+      final availability = BundledPrayerAlarmSoundAvailability(
+        bundle: bundle,
+        allowTechnicallyVerifiedDebugSounds: false,
+      );
 
-    expect(await availability.availableSounds(), {
-      PrayerAlarmSound.systemDefault,
-      PrayerAlarmSound.silent,
-    });
-  });
+      expect(await availability.availableSounds(), {
+        PrayerAlarmSound.systemDefault,
+        PrayerAlarmSound.silent,
+      });
+    },
+  );
 
-  test('debug still rejects a sound that failed technical verification', () async {
-    final manifest = _manifest();
-    final sounds = manifest['sounds'] as Map<String, dynamic>;
-    (sounds[PrayerAlarmSound.jerusalem.name] as Map<String, dynamic>)[
-          'technicalVerified'
-        ] =
-        false;
-    final availability = BundledPrayerAlarmSoundAvailability(
-      bundle: _bundle(manifest: manifest),
-      allowTechnicallyVerifiedDebugSounds: true,
-    );
+  test(
+    'debug still rejects a sound that failed technical verification',
+    () async {
+      final manifest = _manifest();
+      final sounds = manifest['sounds'] as Map<String, dynamic>;
+      (sounds[PrayerAlarmSound.jerusalem.name]
+              as Map<String, dynamic>)['technicalVerified'] =
+          false;
+      final availability = BundledPrayerAlarmSoundAvailability(
+        bundle: _bundle(manifest: manifest),
+        allowTechnicallyVerifiedDebugSounds: true,
+      );
 
-    expect(
-      await availability.availableSounds(),
-      isNot(contains(PrayerAlarmSound.jerusalem)),
-    );
-  });
+      expect(
+        await availability.availableSounds(),
+        isNot(contains(PrayerAlarmSound.jerusalem)),
+      );
+    },
+  );
 }
 
 Map<String, dynamic> _manifest() => {

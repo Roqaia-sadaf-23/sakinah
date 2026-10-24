@@ -318,10 +318,7 @@ void main() {
     expect(find.text('Masjid al-Haram Adhan'), findsOneWidget);
     expect(find.text('Prophet’s Mosque Adhan'), findsOneWidget);
     expect(find.text('Silent'), findsOneWidget);
-    expect(
-      find.text('Unavailable in this version'),
-      findsNWidgets(3),
-    );
+    expect(find.text('Unavailable in this version'), findsNWidgets(3));
     expect(find.text('Test selected sound after 10 seconds'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byTooltip('Preview System default'),

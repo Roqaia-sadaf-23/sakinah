@@ -74,8 +74,7 @@ class BundledPrayerAlarmSoundAvailability
       // verified local files; profile/release builds still require both the
       // permission flag and its supporting metadata.
       final redistributionVerified = entry['verified'] == true;
-      if (!redistributionVerified &&
-          !_allowTechnicallyVerifiedDebugSounds) {
+      if (!redistributionVerified && !_allowTechnicallyVerifiedDebugSounds) {
         continue;
       }
       if (redistributionVerified) {
