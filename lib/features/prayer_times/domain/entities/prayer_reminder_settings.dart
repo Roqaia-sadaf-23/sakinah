@@ -1,6 +1,12 @@
 enum PrayerReminderType { takbeer, text }
 
-enum PrayerAlarmSound { systemDefault, takbeer, silent }
+enum PrayerAlarmSound {
+  jerusalem,
+  masjidAlHaram,
+  masjidAnNabawi,
+  systemDefault,
+  silent,
+}
 
 class PrayerReminderSettings {
   const PrayerReminderSettings({
@@ -10,11 +16,7 @@ class PrayerReminderSettings {
     PrayerReminderType type = PrayerReminderType.text,
     this.notificationPermissionRequested = false,
     this.exactAlarmPermissionRequested = false,
-  }) : alarmSound =
-           alarmSound ??
-           (type == PrayerReminderType.takbeer
-               ? PrayerAlarmSound.takbeer
-               : PrayerAlarmSound.systemDefault);
+  }) : alarmSound = alarmSound ?? PrayerAlarmSound.systemDefault;
 
   static const defaults = PrayerReminderSettings();
   static const minMinutesBefore = 1;
@@ -28,7 +30,12 @@ class PrayerReminderSettings {
   final bool exactAlarmPermissionRequested;
 
   /// Kept for stored-setting and API compatibility with older app versions.
-  PrayerReminderType get type => alarmSound == PrayerAlarmSound.takbeer
+  PrayerReminderType get type =>
+      {
+        PrayerAlarmSound.jerusalem,
+        PrayerAlarmSound.masjidAlHaram,
+        PrayerAlarmSound.masjidAnNabawi,
+      }.contains(alarmSound)
       ? PrayerReminderType.takbeer
       : PrayerReminderType.text;
 
@@ -47,11 +54,7 @@ class PrayerReminderSettings {
     minutesBefore: minutesBefore ?? this.minutesBefore,
     alarmSound:
         alarmSound ??
-        (type == null
-            ? this.alarmSound
-            : type == PrayerReminderType.takbeer
-            ? PrayerAlarmSound.takbeer
-            : PrayerAlarmSound.systemDefault),
+        (type == null ? this.alarmSound : PrayerAlarmSound.systemDefault),
     notificationPermissionRequested:
         notificationPermissionRequested ?? this.notificationPermissionRequested,
     exactAlarmPermissionRequested:
@@ -64,12 +67,14 @@ class PrayerReminderSettings {
     final minutes = storedMinutes is num ? storedMinutes.toInt() : 5;
     final migratedSound = switch (json['alarmSound']) {
       'systemDefault' => PrayerAlarmSound.systemDefault,
-      'takbeer' => PrayerAlarmSound.takbeer,
+      'jerusalem' => PrayerAlarmSound.jerusalem,
+      'masjidAlHaram' => PrayerAlarmSound.masjidAlHaram,
+      'masjidAnNabawi' => PrayerAlarmSound.masjidAnNabawi,
       'silent' => PrayerAlarmSound.silent,
-      _ =>
-        json['type'] == PrayerReminderType.takbeer.name
-            ? PrayerAlarmSound.takbeer
-            : PrayerAlarmSound.systemDefault,
+      // The legacy Takbeer file has no provenance in this repository, so an
+      // old value must not be attributed to one of the three named places.
+      'takbeer' => PrayerAlarmSound.systemDefault,
+      _ => PrayerAlarmSound.systemDefault,
     };
     return PrayerReminderSettings(
       enabled: json['enabled'] == true,

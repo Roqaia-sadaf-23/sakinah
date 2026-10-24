@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../../core/notifications/notification_ids.dart';
-import '../../../../core/notifications/prayer_notification_channels.dart';
 import '../../../../core/notifications/notification_service.dart';
 import '../../../../core/storage/storage_keys.dart';
 import '../../../../core/storage/storage_service.dart';
@@ -12,6 +11,8 @@ import '../../../../core/utils/timezone_utils.dart';
 import '../../domain/entities/prayer.dart';
 import '../../domain/entities/prayer_reminder_settings.dart';
 import '../../domain/entities/prayer_schedule.dart';
+import 'prayer_alarm_sound_availability.dart';
+import 'prayer_alarm_sound_config.dart';
 
 typedef PrayerReminderNow = tz.TZDateTime Function(tz.Location location);
 
@@ -59,11 +60,15 @@ class PrayerNotificationScheduler {
     this._notifications,
     this._storage, {
     PrayerReminderNow? now,
-  }) : _now = now ?? tz.TZDateTime.now;
+    PrayerAlarmSoundAvailability? soundAvailability,
+  }) : _now = now ?? tz.TZDateTime.now,
+       _soundAvailability =
+           soundAvailability ?? BundledPrayerAlarmSoundAvailability();
 
   final NotificationService _notifications;
   final StorageService _storage;
   final PrayerReminderNow _now;
+  final PrayerAlarmSoundAvailability _soundAvailability;
 
   List<PrayerSchedule> _schedules = const [];
   String _languageCode = 'en';
@@ -92,36 +97,38 @@ class PrayerNotificationScheduler {
 
   Future<void> cancelPrayerReminders() => _enqueue(_cancelStoredIds);
 
-  /// Schedules a real Takbeer notification through the production scheduling
-  /// service. The debug UI uses this to inspect Android's runtime behavior.
-  Future<void> scheduleDebugTakbeerTest() {
-    if (!kDebugMode) {
-      return Future<void>.error(
-        StateError('The Takbeer notification test is debug-only.'),
-      );
-    }
-
+  Future<void> scheduleSoundTest(
+    PrayerAlarmSound sound, {
+    required String languageCode,
+  }) {
     return _enqueue(() async {
+      await _ensureSoundAvailable(sound);
       await _notifications.initialize();
-      await _notifications.refreshLocalTimezone();
-      final scheduledDate = _now(tz.local).add(const Duration(seconds: 10));
+      final timezone = await _notifications.refreshLocalTimezone();
+      final scheduledDate = _now(
+        TimezoneUtils.location(timezone),
+      ).add(const Duration(seconds: 10));
+      final config = sound.config;
       await _notifications.schedule(
         LocalNotificationRequest(
           id: 900000001,
-          title: 'Sakinah notification test',
-          body: 'Debug Takbeer notification scheduled in 10 seconds',
+          title: languageCode == 'ar' ? 'سكينة' : 'Sakinah',
+          body: languageCode == 'ar'
+              ? 'اختبار صوت تذكير الصلاة'
+              : 'Prayer reminder sound test',
           scheduledDate: scheduledDate,
-          channelId: PrayerNotificationChannels.takbeerId,
-          channelName: PrayerNotificationChannels.takbeerName,
-          channelDescription: PrayerNotificationChannels.takbeerDescription,
-          payload: 'prayer-reminder:debug-takbeer-test',
-          androidSoundResource: PrayerNotificationChannels.takbeerSoundResource,
+          channelId: config.channelId,
+          channelName: config.channelName,
+          channelDescription: config.channelDescription,
+          payload: 'prayer-reminder:sound-test',
+          androidSoundResource: config.androidResource,
+          playSound: config.playSound,
         ),
       );
       debugPrint(
-        '[PrayerNotification] Scheduled debug Takbeer test '
+        '[PrayerNotification] Scheduled sound test '
         'id=900000001 at=$scheduledDate '
-        'channel=${PrayerNotificationChannels.takbeerId}',
+        'channel=${config.channelId}',
       );
     });
   }
@@ -155,6 +162,7 @@ class PrayerNotificationScheduler {
 
         final isArabic = languageCode == 'ar';
         final sound = settings.alarmSound;
+        final soundConfig = sound.config;
         final id = NotificationIds.prayerReminder(
           date: schedule.date,
           prayerSlot: slot,
@@ -169,30 +177,11 @@ class PrayerNotificationScheduler {
             isArabic: isArabic,
             minutes: settings.minutesBefore,
           ),
-          channelId: switch (sound) {
-            PrayerAlarmSound.systemDefault =>
-              PrayerNotificationChannels.defaultId,
-            PrayerAlarmSound.takbeer => PrayerNotificationChannels.takbeerId,
-            PrayerAlarmSound.silent => PrayerNotificationChannels.silentId,
-          },
-          channelName: switch (sound) {
-            PrayerAlarmSound.systemDefault =>
-              PrayerNotificationChannels.defaultName,
-            PrayerAlarmSound.takbeer => PrayerNotificationChannels.takbeerName,
-            PrayerAlarmSound.silent => PrayerNotificationChannels.silentName,
-          },
-          channelDescription: switch (sound) {
-            PrayerAlarmSound.systemDefault =>
-              PrayerNotificationChannels.defaultDescription,
-            PrayerAlarmSound.takbeer =>
-              PrayerNotificationChannels.takbeerDescription,
-            PrayerAlarmSound.silent =>
-              PrayerNotificationChannels.silentDescription,
-          },
-          androidSoundResource: sound == PrayerAlarmSound.takbeer
-              ? PrayerNotificationChannels.takbeerSoundResource
-              : null,
-          playSound: sound != PrayerAlarmSound.silent,
+          channelId: soundConfig.channelId,
+          channelName: soundConfig.channelName,
+          channelDescription: soundConfig.channelDescription,
+          androidSoundResource: soundConfig.androidResource,
+          playSound: soundConfig.playSound,
         );
       }
     }
@@ -212,7 +201,7 @@ class PrayerNotificationScheduler {
     // Keep the OS-owned reminders until replacement schedules are available.
     if (_schedules.isEmpty) return;
 
-    await _cancelStoredIds();
+    await _ensureSoundAvailable(settings.alarmSound);
 
     await _notifications.initialize();
     await _notifications.refreshLocalTimezone();
@@ -228,6 +217,7 @@ class PrayerNotificationScheduler {
     if (!notificationsEnabled) return;
 
     final plans = buildPlans(_schedules, settings, languageCode: _languageCode);
+    final oldIds = _storedIds();
     final scheduledIds = <int>[];
     Object? firstFailure;
     StackTrace? firstFailureStack;
@@ -253,27 +243,47 @@ class PrayerNotificationScheduler {
         }
       }
     }
-    await _storage.writeJson(StorageKeys.prayerReminderScheduledIds, {
-      'ids': scheduledIds,
-    });
     if (firstFailure != null) {
+      // Some same-ID requests may already have been replaced. Keep the union
+      // so every old or new request remains manageable on the next attempt.
+      await _writeStoredIds({...oldIds, ...scheduledIds});
       Error.throwWithStackTrace(firstFailure, firstFailureStack!);
+    }
+
+    // Scheduling with a stable ID replaces that prayer's pending request
+    // without creating a duplicate. Only stale IDs are cancelled, and only
+    // after all replacement requests have succeeded.
+    final replacementIds = scheduledIds.toSet();
+    for (final staleId in oldIds.difference(replacementIds)) {
+      await _notifications.cancel(staleId);
+    }
+    await _writeStoredIds(replacementIds);
+  }
+
+  Set<int> _storedIds() {
+    final stored = _storage.readJson(StorageKeys.prayerReminderScheduledIds);
+    final rawIds = stored?['ids'];
+    return rawIds is List
+        ? rawIds.whereType<num>().map((value) => value.toInt()).toSet()
+        : <int>{};
+  }
+
+  Future<void> _writeStoredIds(Set<int> ids) => _storage.writeJson(
+    StorageKeys.prayerReminderScheduledIds,
+    {'ids': ids.toList()..sort()},
+  );
+
+  Future<void> _ensureSoundAvailable(PrayerAlarmSound sound) async {
+    if (!await _soundAvailability.isAvailable(sound)) {
+      throw PrayerAlarmSoundUnavailableException(sound);
     }
   }
 
   Future<void> _cancelStoredIds() async {
-    final stored = _storage.readJson(StorageKeys.prayerReminderScheduledIds);
-    final rawIds = stored?['ids'];
-    final ids = rawIds is List
-        ? rawIds.whereType<num>().map((value) => value.toInt()).toSet()
-        : const <int>{};
-
-    for (final id in ids) {
+    for (final id in _storedIds()) {
       await _notifications.cancel(id);
     }
-    await _storage.writeJson(StorageKeys.prayerReminderScheduledIds, {
-      'ids': <int>[],
-    });
+    await _writeStoredIds(<int>{});
   }
 
   Future<void> _enqueue(Future<void> Function() operation) {

@@ -3,18 +3,14 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 abstract final class PrayerNotificationChannels {
   // Android persists channel sound settings. Increment these IDs whenever a
   // released channel's sound configuration must change.
-  static const defaultId = 'prayer_reminders_default_v2';
-  static const defaultName = 'Prayer Reminders';
-  static const defaultDescription = 'Prayer reminder notifications';
+  static const defaultId = 'prayer_reminders_default_v3';
+  static const defaultName = 'تذكيرات الصلاة - صوت الجهاز';
+  static const defaultDescription =
+      'تذكيرات الصلاة بصوت الإشعارات الافتراضي للجهاز';
 
-  static const takbeerId = 'prayer_reminders_takbeer_v2';
-  static const takbeerName = 'Prayer Reminders - Takbeer';
-  static const takbeerDescription = 'Prayer reminders using Takbeer sound';
-  static const takbeerSoundResource = 'takbeer_notification';
-
-  static const silentId = 'prayer_reminders_silent_v1';
-  static const silentName = 'Prayer Reminders - Silent';
-  static const silentDescription = 'Silent prayer reminder notifications';
+  static const silentId = 'prayer_reminders_silent_v2';
+  static const silentName = 'تذكيرات الصلاة - صامت';
+  static const silentDescription = 'تذكيرات الصلاة دون صوت';
 
   static const defaultChannel = AndroidNotificationChannel(
     defaultId,
@@ -22,16 +18,6 @@ abstract final class PrayerNotificationChannels {
     description: defaultDescription,
     importance: Importance.high,
     playSound: true,
-    audioAttributesUsage: AudioAttributesUsage.notification,
-  );
-
-  static const takbeerChannel = AndroidNotificationChannel(
-    takbeerId,
-    takbeerName,
-    description: takbeerDescription,
-    importance: Importance.high,
-    playSound: true,
-    sound: RawResourceAndroidNotificationSound(takbeerSoundResource),
     audioAttributesUsage: AudioAttributesUsage.notification,
   );
 
@@ -45,7 +31,6 @@ abstract final class PrayerNotificationChannels {
 
   static const all = <AndroidNotificationChannel>[
     defaultChannel,
-    takbeerChannel,
     silentChannel,
   ];
 
@@ -65,20 +50,6 @@ abstract final class PrayerNotificationChannels {
         priority: Priority.high,
         category: AndroidNotificationCategory.reminder,
         playSound: false,
-      );
-    }
-
-    if (channelId == takbeerId) {
-      return const AndroidNotificationDetails(
-        takbeerId,
-        takbeerName,
-        channelDescription: takbeerDescription,
-        importance: Importance.high,
-        priority: Priority.high,
-        category: AndroidNotificationCategory.reminder,
-        playSound: true,
-        sound: RawResourceAndroidNotificationSound(takbeerSoundResource),
-        audioAttributesUsage: AudioAttributesUsage.notification,
       );
     }
 

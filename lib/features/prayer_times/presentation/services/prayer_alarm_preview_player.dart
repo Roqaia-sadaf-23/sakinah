@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../domain/entities/prayer_reminder_settings.dart';
+import 'prayer_alarm_sound_config.dart';
 
 abstract class PrayerAlarmPreviewPlayer {
   Future<void> preview(PrayerAlarmSound sound);
@@ -16,8 +17,6 @@ class JustAudioPrayerAlarmPreviewPlayer implements PrayerAlarmPreviewPlayer {
   JustAudioPrayerAlarmPreviewPlayer({AudioPlayer? player})
     : _player = player ?? AudioPlayer();
 
-  static const takbeerAsset =
-      'android/app/src/main/res/raw/takbeer_notification.mp3';
   static const androidDefaultNotificationSound =
       'content://settings/system/notification_sound';
 
@@ -33,8 +32,10 @@ class JustAudioPrayerAlarmPreviewPlayer implements PrayerAlarmPreviewPlayer {
           return _player.play();
         }
         return SystemSound.play(SystemSoundType.alert);
-      case PrayerAlarmSound.takbeer:
-        await _player.setAsset(takbeerAsset);
+      case PrayerAlarmSound.jerusalem:
+      case PrayerAlarmSound.masjidAlHaram:
+      case PrayerAlarmSound.masjidAnNabawi:
+        await _player.setAsset(sound.config.flutterAssetPath!);
         return _player.play();
       case PrayerAlarmSound.silent:
         return;

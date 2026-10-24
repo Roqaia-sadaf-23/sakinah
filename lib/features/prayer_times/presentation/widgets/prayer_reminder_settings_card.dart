@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -140,7 +139,8 @@ class PrayerReminderSettingsCard extends StatelessWidget {
               _AlarmSoundOption(
                 sound: sound,
                 selected: settings.alarmSound == sound,
-                enabled: !busy,
+                enabled: !busy && controller.isSoundAvailable(sound),
+                available: controller.isSoundAvailable(sound),
                 previewing: controller.previewingSound.value == sound,
                 onSelected: () => controller.setAlarmSound(sound),
                 onPreview: () async {
@@ -161,29 +161,33 @@ class PrayerReminderSettingsCard extends StatelessWidget {
               if (sound != PrayerAlarmSound.values.last)
                 const SizedBox(height: 8),
             ],
-            if (kDebugMode) ...[
-              const SizedBox(height: 14),
-              OutlinedButton.icon(
-                onPressed: busy
-                    ? null
-                    : () async {
-                        final scheduled = await controller
-                            .scheduleDebugTakbeerTest();
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              scheduled
-                                  ? 'Takbeer notification scheduled in 10 seconds'
-                                  : 'Could not schedule the Takbeer notification',
-                            ),
-                          ),
-                        );
-                      },
-                icon: const Icon(Icons.bug_report_outlined),
-                label: const Text('Test Takbeer notification (10 seconds)'),
-              ),
-            ],
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      final result = await controller
+                          .scheduleNotificationTest();
+                      if (!context.mounted) return;
+                      final messageKey = switch (result) {
+                        PrayerNotificationTestResult.scheduled =>
+                          'notification_test_scheduled',
+                        PrayerNotificationTestResult.notificationsDenied =>
+                          'notification_permission_denied',
+                        PrayerNotificationTestResult.exactAlarmDenied =>
+                          'exact_alarm_permission_denied',
+                        PrayerNotificationTestResult.soundUnavailable =>
+                          'alarm_sound_file_missing',
+                        PrayerNotificationTestResult.schedulingFailed =>
+                          'notification_test_failed',
+                      };
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(messageKey.tr)));
+                    },
+              icon: const Icon(Icons.notifications_active_outlined),
+              label: Text('test_selected_sound'.tr),
+            ),
             if (issue != null) ...[
               const SizedBox(height: 14),
               _PermissionWarning(
@@ -192,10 +196,14 @@ class PrayerReminderSettingsCard extends StatelessWidget {
                     'notification_permission_denied',
                   PrayerReminderPermissionIssue.exactAlarm =>
                     'exact_alarm_permission_denied',
+                  PrayerReminderPermissionIssue.soundFileMissing =>
+                    'alarm_sound_file_missing',
                   PrayerReminderPermissionIssue.scheduling =>
                     'notification_scheduling_error',
                 },
                 busy: busy,
+                showSettings:
+                    issue != PrayerReminderPermissionIssue.soundFileMissing,
                 onOpenSettings: controller.openRelevantSettings,
               ),
             ],
@@ -211,6 +219,7 @@ class _AlarmSoundOption extends StatelessWidget {
     required this.sound,
     required this.selected,
     required this.enabled,
+    required this.available,
     required this.previewing,
     required this.onSelected,
     required this.onPreview,
@@ -219,6 +228,7 @@ class _AlarmSoundOption extends StatelessWidget {
   final PrayerAlarmSound sound;
   final bool selected;
   final bool enabled;
+  final bool available;
   final bool previewing;
   final VoidCallback onSelected;
   final VoidCallback onPreview;
@@ -227,13 +237,17 @@ class _AlarmSoundOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final label = switch (sound) {
+      PrayerAlarmSound.jerusalem => 'alarm_sound_jerusalem'.tr,
+      PrayerAlarmSound.masjidAlHaram => 'alarm_sound_masjid_al_haram'.tr,
+      PrayerAlarmSound.masjidAnNabawi => 'alarm_sound_masjid_an_nabawi'.tr,
       PrayerAlarmSound.systemDefault => 'alarm_sound_default'.tr,
-      PrayerAlarmSound.takbeer => 'alarm_sound_takbeer'.tr,
       PrayerAlarmSound.silent => 'alarm_sound_silent'.tr,
     };
     final icon = switch (sound) {
+      PrayerAlarmSound.jerusalem => Icons.mosque_outlined,
+      PrayerAlarmSound.masjidAlHaram => Icons.mosque_rounded,
+      PrayerAlarmSound.masjidAnNabawi => Icons.mosque_rounded,
       PrayerAlarmSound.systemDefault => Icons.notifications_outlined,
-      PrayerAlarmSound.takbeer => Icons.volume_up_outlined,
       PrayerAlarmSound.silent => Icons.notifications_off_outlined,
     };
 
@@ -256,12 +270,28 @@ class _AlarmSoundOption extends StatelessWidget {
                 Icon(icon, size: 21, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: available
+                              ? colorScheme.onSurface
+                              : colorScheme.onSurfaceVariant,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                      if (!available)
+                        Text(
+                          'alarm_sound_unavailable_short'.tr,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colorScheme.error),
+                        ),
+                    ],
                   ),
                 ),
                 if (selected)
@@ -402,11 +432,13 @@ class _PermissionWarning extends StatelessWidget {
   const _PermissionWarning({
     required this.messageKey,
     required this.busy,
+    required this.showSettings,
     required this.onOpenSettings,
   });
 
   final String messageKey;
   final bool busy;
+  final bool showSettings;
   final VoidCallback onOpenSettings;
 
   @override
@@ -433,11 +465,13 @@ class _PermissionWarning extends StatelessWidget {
               style: TextStyle(color: colorScheme.onErrorContainer),
             ),
           ),
-          const SizedBox(width: 6),
-          TextButton(
-            onPressed: busy ? null : onOpenSettings,
-            child: Text('open_settings'.tr),
-          ),
+          if (showSettings) ...[
+            const SizedBox(width: 6),
+            TextButton(
+              onPressed: busy ? null : onOpenSettings,
+              child: Text('open_settings'.tr),
+            ),
+          ],
         ],
       ),
     );

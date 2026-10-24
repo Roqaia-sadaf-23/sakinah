@@ -88,8 +88,10 @@ flutter:
     - assets/data/azkar/
     - assets/data/quran/
     - assets/quran/mushaf/hafs_kfqc/pages_bz2/
-    # Also bundled as an Android raw resource for notification channels.
-    - android/app/src/main/res/raw/takbeer_notification.mp3
+    - assets/data/prayer_notification_sounds.json
+    # Notification audio must also live in Android's raw resources. Including
+    # the directory here makes verified files available to the preview player.
+    - android/app/src/main/res/raw/
 
   fonts:
     - family: NotoNaskhArabic

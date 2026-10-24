@@ -8,6 +8,8 @@ import 'package:sakinah/core/storage/storage_service.dart';
 import 'package:sakinah/features/prayer_times/domain/entities/prayer.dart';
 import 'package:sakinah/features/prayer_times/domain/entities/prayer_reminder_settings.dart';
 import 'package:sakinah/features/prayer_times/domain/entities/prayer_schedule.dart';
+import 'package:sakinah/features/prayer_times/presentation/services/prayer_alarm_sound_availability.dart';
+import 'package:sakinah/features/prayer_times/presentation/services/prayer_alarm_sound_config.dart';
 import 'package:sakinah/features/prayer_times/presentation/services/prayer_notification_scheduler.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -65,27 +67,44 @@ void main() {
       expect(plans, isEmpty);
     });
 
-    test('Takbeer plans use the dedicated channel and raw sound', () {
+    test('each attributed Adhan uses its dedicated channel and raw sound', () {
       final scheduler = _scheduler(
         now: (location) => tz.TZDateTime(location, 2026, 8, 30, 18),
       );
-      final plan = scheduler
-          .buildPlans(
-            [
-              _schedule(prayers: [_prayer(PrayerName.maghrib, 18, 36)]),
-            ],
-            const PrayerReminderSettings(
-              enabled: true,
-              minutesBefore: 15,
-              type: PrayerReminderType.takbeer,
-            ),
-            languageCode: 'en',
-          )
-          .single;
+      const expected = <PrayerAlarmSound, (String, String)>{
+        PrayerAlarmSound.jerusalem: (
+          'prayer_reminders_adhan_jerusalem_v1',
+          'adhan_jerusalem_short',
+        ),
+        PrayerAlarmSound.masjidAlHaram: (
+          'prayer_reminders_adhan_masjid_al_haram_v1',
+          'adhan_masjid_al_haram_short',
+        ),
+        PrayerAlarmSound.masjidAnNabawi: (
+          'prayer_reminders_adhan_masjid_an_nabawi_v1',
+          'adhan_masjid_an_nabawi_short',
+        ),
+      };
 
-      expect(plan.channelId, 'prayer_reminders_takbeer_v2');
-      expect(plan.androidSoundResource, 'takbeer_notification');
-      expect(plan.toRequest().androidSoundResource, 'takbeer_notification');
+      for (final entry in expected.entries) {
+        final plan = scheduler
+            .buildPlans(
+              [
+                _schedule(prayers: [_prayer(PrayerName.maghrib, 18, 36)]),
+              ],
+              PrayerReminderSettings(
+                enabled: true,
+                minutesBefore: 15,
+                alarmSound: entry.key,
+              ),
+              languageCode: 'en',
+            )
+            .single;
+
+        expect(plan.channelId, entry.value.$1);
+        expect(plan.androidSoundResource, entry.value.$2);
+        expect(plan.toRequest().androidSoundResource, entry.value.$2);
+      }
     });
 
     test('normal plans use the dedicated default-sound channel', () {
@@ -102,7 +121,7 @@ void main() {
           )
           .single;
 
-      expect(plan.channelId, 'prayer_reminders_default_v2');
+      expect(plan.channelId, 'prayer_reminders_default_v3');
       expect(plan.androidSoundResource, isNull);
       expect(plan.playSound, isTrue);
     });
@@ -177,35 +196,25 @@ void main() {
   group('Android prayer notification channels', () {
     test('sound channels play and the silent channel does not', () {
       expect(PrayerNotificationChannels.defaultChannel.playSound, isTrue);
-      expect(PrayerNotificationChannels.takbeerChannel.playSound, isTrue);
       expect(PrayerNotificationChannels.silentChannel.playSound, isFalse);
       expect(
         PrayerNotificationChannels.defaultChannel.audioAttributesUsage,
         AudioAttributesUsage.notification,
       );
       expect(
-        PrayerNotificationChannels.takbeerChannel.audioAttributesUsage,
-        AudioAttributesUsage.notification,
-      );
-      expect(
         PrayerNotificationChannels.all.map((channel) => channel.id),
         containsAll(<String>[
-          'prayer_reminders_default_v2',
-          'prayer_reminders_takbeer_v2',
-          'prayer_reminders_silent_v1',
+          'prayer_reminders_default_v3',
+          'prayer_reminders_silent_v2',
         ]),
       );
     });
 
-    test('Takbeer channel and notification details use the raw sound', () {
-      expect(
-        PrayerNotificationChannels.takbeerChannel.sound,
-        isA<RawResourceAndroidNotificationSound>(),
-      );
-
+    test('custom notification details use the selected raw sound', () {
+      final config = PrayerAlarmSound.jerusalem.config;
       final request = _unrelatedRequest(
-        channelId: PrayerNotificationChannels.takbeerId,
-        androidSoundResource: PrayerNotificationChannels.takbeerSoundResource,
+        channelId: config.channelId,
+        androidSoundResource: config.androidResource,
       );
       final details = PrayerNotificationChannels.detailsFor(
         request.channelId,
@@ -214,7 +223,7 @@ void main() {
         androidSoundResource: request.androidSoundResource,
       );
 
-      expect(details.channelId, 'prayer_reminders_takbeer_v2');
+      expect(details.channelId, 'prayer_reminders_adhan_jerusalem_v1');
       expect(details.playSound, isTrue);
       expect(details.sound, isA<RawResourceAndroidNotificationSound>());
       expect(details.audioAttributesUsage, AudioAttributesUsage.notification);
@@ -231,7 +240,7 @@ void main() {
         androidSoundResource: request.androidSoundResource,
       );
 
-      expect(details.channelId, 'prayer_reminders_default_v2');
+      expect(details.channelId, 'prayer_reminders_default_v3');
       expect(details.playSound, isTrue);
       expect(details.sound, isNull);
       expect(details.audioAttributesUsage, AudioAttributesUsage.notification);
@@ -284,7 +293,7 @@ void main() {
 
       expect(notifications.pending, hasLength(2));
       expect(notifications.pending.keys.toSet(), hasLength(2));
-      expect(notifications.cancelled, containsAll(notifications.pending.keys));
+      expect(notifications.cancelled, isEmpty);
 
       await scheduler.settingsChanged(
         const PrayerReminderSettings(enabled: false),
@@ -417,57 +426,60 @@ void main() {
 
     expect(notifications.pending, hasLength(2));
     expect(notifications.pending[202608301]!.scheduledDate.minute, 55);
-    expect(notifications.cancelled, contains(202608301));
-    expect(notifications.cancelled, contains(202608311));
+    expect(notifications.cancelled, isEmpty);
   });
 
-  test('changing to Takbeer replaces requests with Takbeer sound', () async {
-    final storage = _MemoryStorageService();
-    final notifications = _FakeNotificationService();
-    final scheduler = PrayerNotificationScheduler(
-      notifications,
-      storage,
-      now: (location) => tz.TZDateTime(location, 2026, 8, 30),
-    );
-    await storage.writeJson(
-      StorageKeys.prayerReminderSettings,
-      const PrayerReminderSettings(enabled: true).toJson(),
-    );
-    await scheduler.updateSchedules(
-      today: _schedule(prayers: [_prayer(PrayerName.fajr, 5, 10)]),
-      tomorrow: _schedule(
-        date: DateTime(2026, 8, 31),
-        prayers: [_prayer(PrayerName.fajr, 5, 11)],
-      ),
-      languageCode: 'en',
-    );
+  test(
+    'changing to a verified Adhan replaces requests with its sound',
+    () async {
+      final storage = _MemoryStorageService();
+      final notifications = _FakeNotificationService();
+      final scheduler = PrayerNotificationScheduler(
+        notifications,
+        storage,
+        now: (location) => tz.TZDateTime(location, 2026, 8, 30),
+        soundAvailability: const _FakeSoundAvailability.all(),
+      );
+      await storage.writeJson(
+        StorageKeys.prayerReminderSettings,
+        const PrayerReminderSettings(enabled: true).toJson(),
+      );
+      await scheduler.updateSchedules(
+        today: _schedule(prayers: [_prayer(PrayerName.fajr, 5, 10)]),
+        tomorrow: _schedule(
+          date: DateTime(2026, 8, 31),
+          prayers: [_prayer(PrayerName.fajr, 5, 11)],
+        ),
+        languageCode: 'en',
+      );
 
-    expect(notifications.pending[202608301]!.androidSoundResource, isNull);
-    await scheduler.settingsChanged(
-      const PrayerReminderSettings(
-        enabled: true,
-        type: PrayerReminderType.takbeer,
-      ),
-      languageCode: 'en',
-    );
+      expect(notifications.pending[202608301]!.androidSoundResource, isNull);
+      await scheduler.settingsChanged(
+        const PrayerReminderSettings(
+          enabled: true,
+          alarmSound: PrayerAlarmSound.masjidAnNabawi,
+        ),
+        languageCode: 'en',
+      );
 
-    expect(
-      notifications.pending.values,
-      everyElement(
-        isA<LocalNotificationRequest>()
-            .having(
-              (request) => request.channelId,
-              'channelId',
-              'prayer_reminders_takbeer_v2',
-            )
-            .having(
-              (request) => request.androidSoundResource,
-              'androidSoundResource',
-              'takbeer_notification',
-            ),
-      ),
-    );
-  });
+      expect(
+        notifications.pending.values,
+        everyElement(
+          isA<LocalNotificationRequest>()
+              .having(
+                (request) => request.channelId,
+                'channelId',
+                'prayer_reminders_adhan_masjid_an_nabawi_v1',
+              )
+              .having(
+                (request) => request.androidSoundResource,
+                'androidSoundResource',
+                'adhan_masjid_an_nabawi_short',
+              ),
+        ),
+      );
+    },
+  );
 
   test(
     'changing sounds repeatedly keeps stable IDs without duplicates',
@@ -478,6 +490,7 @@ void main() {
         notifications,
         storage,
         now: (location) => tz.TZDateTime(location, 2026, 8, 30),
+        soundAvailability: const _FakeSoundAvailability.all(),
       );
       await storage.writeJson(
         StorageKeys.prayerReminderSettings,
@@ -495,7 +508,7 @@ void main() {
       await scheduler.settingsChanged(
         const PrayerReminderSettings(
           enabled: true,
-          alarmSound: PrayerAlarmSound.takbeer,
+          alarmSound: PrayerAlarmSound.jerusalem,
         ),
         languageCode: 'en',
       );
@@ -520,36 +533,114 @@ void main() {
               .having((request) => request.playSound, 'playSound', isFalse),
         ),
       );
-      expect(
-        notifications.cancelled.where((id) => id == 202608301),
-        hasLength(2),
-      );
-      expect(
-        notifications.cancelled.where((id) => id == 202608311),
-        hasLength(2),
-      );
+      expect(notifications.cancelled, isEmpty);
     },
   );
 
-  test('debug Takbeer test uses the real Takbeer scheduling request', () async {
+  test('sound test uses the selected sound after ten seconds', () async {
     final notifications = _FakeNotificationService();
     final now = tz.TZDateTime(tz.UTC, 2026, 10, 16, 12);
     final scheduler = PrayerNotificationScheduler(
       notifications,
       _MemoryStorageService(),
       now: (_) => now,
+      soundAvailability: const _FakeSoundAvailability.all(),
     );
 
-    await scheduler.scheduleDebugTakbeerTest();
+    await scheduler.scheduleSoundTest(
+      PrayerAlarmSound.masjidAlHaram,
+      languageCode: 'ar',
+    );
 
     final request = notifications.pending[900000001];
     expect(request, isNotNull);
     expect(request!.scheduledDate, now.add(const Duration(seconds: 10)));
-    expect(request.channelId, PrayerNotificationChannels.takbeerId);
-    expect(
-      request.androidSoundResource,
-      PrayerNotificationChannels.takbeerSoundResource,
+    expect(request.channelId, PrayerAlarmSound.masjidAlHaram.config.channelId);
+    expect(request.androidSoundResource, 'adhan_masjid_al_haram_short');
+    expect(request.body, 'اختبار صوت تذكير الصلاة');
+  });
+
+  test('failed replacement does not cancel existing reminders', () async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final scheduler = PrayerNotificationScheduler(
+      notifications,
+      storage,
+      now: (location) => tz.TZDateTime(location, 2026, 8, 30),
     );
+    await storage.writeJson(
+      StorageKeys.prayerReminderSettings,
+      const PrayerReminderSettings(enabled: true).toJson(),
+    );
+    await scheduler.updateSchedules(
+      today: _schedule(prayers: [_prayer(PrayerName.fajr, 5, 10)]),
+      tomorrow: _schedule(
+        date: DateTime(2026, 8, 31),
+        prayers: [_prayer(PrayerName.fajr, 5, 11)],
+      ),
+      languageCode: 'en',
+    );
+
+    notifications.failId = 202608311;
+    await expectLater(
+      scheduler.settingsChanged(
+        const PrayerReminderSettings(
+          enabled: true,
+          alarmSound: PrayerAlarmSound.silent,
+        ),
+        languageCode: 'en',
+      ),
+      throwsStateError,
+    );
+
+    expect(notifications.cancelled, isEmpty);
+    expect(notifications.pending.keys, {202608301, 202608311});
+    expect(storage.readJson(StorageKeys.prayerReminderScheduledIds)?['ids'], [
+      202608301,
+      202608311,
+    ]);
+  });
+
+  test('unverified custom sound leaves existing reminders untouched', () async {
+    final storage = _MemoryStorageService();
+    final notifications = _FakeNotificationService();
+    final existing = _unrelatedRequest(id: 202608301);
+    notifications.pending[existing.id] = existing;
+    await storage.writeJson(StorageKeys.prayerReminderScheduledIds, {
+      'ids': <int>[existing.id],
+    });
+    await storage.writeJson(
+      StorageKeys.prayerReminderSettings,
+      const PrayerReminderSettings(enabled: true).toJson(),
+    );
+    final scheduler = PrayerNotificationScheduler(
+      notifications,
+      storage,
+      now: (location) => tz.TZDateTime(location, 2026, 8, 30),
+      soundAvailability: const _FakeSoundAvailability.systemOnly(),
+    );
+    await scheduler.updateSchedules(
+      today: _schedule(prayers: [_prayer(PrayerName.fajr, 5, 10)]),
+      tomorrow: _schedule(
+        date: DateTime(2026, 8, 31),
+        prayers: [_prayer(PrayerName.fajr, 5, 11)],
+      ),
+      languageCode: 'en',
+    );
+
+    await expectLater(
+      scheduler.settingsChanged(
+        const PrayerReminderSettings(
+          enabled: true,
+          alarmSound: PrayerAlarmSound.jerusalem,
+        ),
+        languageCode: 'en',
+      ),
+      throwsA(isA<PrayerAlarmSoundUnavailableException>()),
+    );
+
+    expect(notifications.pending, contains(existing.id));
+    expect(notifications.cancelled, isEmpty);
   });
 
   test('cancelling prayer reminders leaves unrelated notifications', () async {
@@ -612,6 +703,7 @@ class _FakeNotificationService implements NotificationService {
   final cancelled = <int>[];
   bool notificationsEnabled = true;
   bool exactAlarmsEnabled = true;
+  int? failId;
 
   @override
   Future<void> initialize() async {}
@@ -645,8 +737,25 @@ class _FakeNotificationService implements NotificationService {
 
   @override
   Future<void> schedule(LocalNotificationRequest request) async {
+    if (request.id == failId) throw StateError('simulated schedule failure');
     pending[request.id] = request;
   }
+}
+
+class _FakeSoundAvailability implements PrayerAlarmSoundAvailability {
+  const _FakeSoundAvailability.all() : _all = true;
+  const _FakeSoundAvailability.systemOnly() : _all = false;
+
+  final bool _all;
+
+  @override
+  Future<Set<PrayerAlarmSound>> availableSounds() async => _all
+      ? PrayerAlarmSound.values.toSet()
+      : {PrayerAlarmSound.systemDefault, PrayerAlarmSound.silent};
+
+  @override
+  Future<bool> isAvailable(PrayerAlarmSound sound) async =>
+      (await availableSounds()).contains(sound);
 }
 
 class _MemoryStorageService extends StorageService {
